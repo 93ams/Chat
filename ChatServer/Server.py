@@ -11,7 +11,6 @@ class ChatServer():
     def run(self):
         while True:
             message = self.input.recv()
-            print message
             self.output.send(message)
         pub.close()
         pull.close()

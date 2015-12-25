@@ -1,30 +1,33 @@
-import zmq, sys, threading
+import zmq, sys, threading, json
 from Tkinter import *
 import tkMessageBox
 
 class Backend(threading.Thread):
-    def __init__(self, output, writeHandler, port):
+    def __init__(self, output, writeHandler, ip, port):
         super(Backend, self).__init__ ()
         self._stop = threading.Event()
         self.output = output
         self.writeHandler = writeHandler
         self.port = port
+        self.ip = ip
 
     def run(self):
         ctx = zmq.Context()
         sub = ctx.socket(zmq.SUB)
-        sub.connect('tcp://localhost:'+str(self.port))
+        sub.connect('tcp://' + self.ip + ':'+str(self.port))
         sub.setsockopt(zmq.SUBSCRIBE, "")
         while True:
             message = sub.recv()
+            message = json.loads(message)
+            message = message["user"] + ": " + message["text"]
             self.writeHandler(self.output, message)
 
 class Frontend():
-    def __init__(self, port):
+    def __init__(self, ip, port):
         self.input = input
         ctx = zmq.Context()
         self.output = ctx.socket(zmq.PUSH)
-        self.output.connect('tcp://localhost:'+str(port))
+        self.output.connect('tcp://' + ip + ':' + str(port))
 
     def send(self, msg):
         self.output.send_string(msg)
@@ -108,8 +111,8 @@ class ChatClient(Frame):
         sendButton = Button(sendingGrid, text="Send", command=self.handleSend)
         sendButton.grid(row=0, column=1, sticky=E)
 
-    def _initServer(self, port):
-        self.backend = Backend(self.RMessages, self.handleRecieve, port)
+    def _initServer(self, ip, port):
+        self.backend = Backend(self.RMessages, self.handleRecieve, ip, port)
         self.backend.start()
 
     def handleRecieve(self, output, msg):
@@ -120,9 +123,12 @@ class ChatClient(Frame):
     def handleSend(self, event=None):
         if self.username != "" and self.output_port_set and self.input_port_set:
             message = self.SMessageText.get()
-            message = self.username + ": " + message
             self.SMessageText.set("")
-            self.frontend.send(message)
+            message = {
+                "text": message,
+                "user": self.username
+            }
+            self.frontend.send(json.dumps(message))
         else:
             if self.username == "":
                 tkMessageBox.showwarning("Error!", "Please set your username first!")
@@ -146,7 +152,7 @@ class ChatClient(Frame):
             self.input_port_set = True
             self.serverField.config(state=DISABLED)
             self.serverButton.config(state=DISABLED)
-            self._initServer(self.input_port)
+            self._initServer("localhost", self.input_port)
         except:
             tkMessageBox.showwarning("Error", "Invalid port number!")
 
@@ -156,7 +162,7 @@ class ChatClient(Frame):
             self.output_port_set = True
             self.clientField.config(state=DISABLED)
             self.clientButton.config(state=DISABLED)
-            self.frontend = Frontend(self.output_port)
+            self.frontend = Frontend("localhost", self.output_port)
         except:
             tkMessageBox.showwarning("Error", "Invalid port number!")
 

@@ -1,54 +1,37 @@
-from bottle import get, post, request, run
-import json, requests
+from bottle import Bottle, request
+import json
 
-chatServers = []
-messageQueue = []
+class NameServer(Bottle):
+    def __init__(self, host, port):
+        super(NameServer, self).__init__()
+        self._host = host
+        self._port = port
+        self._server_list = []
+        self._routes()
 
-class NameServer():
-    def __init__(self, port):
-        self.port = port
+    def _routes(self):
+        self.route('/register', method="POST", callback=self._register)
 
-    @get('/')
-    def test():
-        return "OK"
+    def start(self):
+        self.run(host=self._host, port=self._port)
 
-    @post('/register')
-    def register():
-        new_server = {}
+    def _register(self):
         response = {}
-        content_data = json.loads(request.json)
-        response["valid"] = False
-        valid = True
+        new_server = {}
         try:
-            if content_data["ip"]:
-                new_server["ip"] = str(content_data["ip"])
-            else:
-                valid = False
-            if content_data["pub_port"]:
-                new_server["pub_port"] = int(content_data["pub_port"])
-            else:
-                valid = False
-            if content_data["pull_port"]:
-                new_server["pull_port"] = int(content_data["pull_port"])
-            else:
-                valid = False
-            if content_data["reply_port"]:
-                new_server["reply_port"] = int(content_data["reply_port"])
-            else:
-                valid = False
-
-            response["valid"] = valid
-            if valid:
-                chatServers.append(new_server)
-                response["server_list"] = chatServers
+            content_data = json.loads(request.body.read())
+            new_server["ip"] = str(content_data["ip"])
+            new_server["pub_port"] = int(content_data["pub_port"])
+            new_server["pull_port"] = int(content_data["pull_port"])
+            new_server["reply_port"] = int(content_data["reply_port"])
+            response["server_list"] = self._server_list[:]
+            response["valid"] = True
+            self._server_list.append(new_server)
         except:
-            print "ups"
+            response["valid"] = False
 
-        return response
-
-    def run(self):
-        run(host='localhost', port=self.port, debug=True)
+        return json.dumps(response)
 
 if __name__ == '__main__':
-    server = NameServer(7999)
-    server.run()
+    server = NameServer(host='localhost', port=7999)
+    server.start()

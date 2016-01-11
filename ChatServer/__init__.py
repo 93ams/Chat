@@ -1,1 +1,1 @@
-from Server import ChatServer
+from ChatServer import ChatServer

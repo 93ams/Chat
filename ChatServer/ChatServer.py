@@ -29,18 +29,38 @@ class Worker(threading.Thread):
         self.__push = push_socket
         self.__pub  = publish_socket
 
+    def send_message(self, data):
+        try:
+            msg = {}
+            msg["from"] = data["from"]
+            msg["message"] = data["message"]
+            msg = data["to"] + ' ' + json.dumps(msg)
+            tprint(msg)
+            self.__pub.send_string(msg)
+        except:
+            self.__pub.send_string(data)
+
+    def recv_message(self):
+        msg = self.__pull.recv()
+        try:
+            msg = json.loads(msg)
+        except:
+            pass
+        return msg
+
     def run(self):
         while True:
-            message = self.__pull.recv()
-            self.__pub.send(message)
+            data = self.recv_message()
+            self.send_message(data)
 
     def stop(self):
         self._Thread__stop()
 
 class ChatServer():
     def __init__(self, host = "localhost"):
-        self.__registered = False
         self.__host       = host
+        self.__registered = False
+        self.__id         = ""
         self.__boot()
 
     def __setup_worker(self):
@@ -57,10 +77,18 @@ class ChatServer():
         self.__pub_port  = find_a_port(self.__publish_socket,  9000)
         self.__setup_worker()
 
+    def unregister(self):
+        try:
+            self.__ns.unregister(self.__id)
+            self.__registered = False
+            return True
+        except:
+            return False
+
     def register(self, ns_host, ns_port):
         try:
             self.__ns = Pyro4.Proxy("PYRONAME:nameserver.servers")
-            self.__ns.register(self.__host, self.__pull_port, self.__pub_port)
+            self.__id = self.__ns.register(self.__host, self.__pull_port, self.__pub_port)
             self.__registered = True
             return True
         except:
@@ -89,7 +117,7 @@ class ChatServer():
                     except:
                         tprint("failed")
                 elif cmd[0] == "P":
-                    message = ":".join(cmd[1:])
+                    message = raw_input("Message> ")
                     self.__publish_socket.send(message)
                 else:
                     print "invalid command"
@@ -98,11 +126,8 @@ class ChatServer():
         self.__worker.stop()
         self.__pull_socket.close()
         self.__publish_socket.close()
-        self.__push_socket.close()
         if self.__registered:
-            self.__ns.unregister()
-            self.__registered = False
-        self.__stopped = True
+            self.unregister()
 
 def main():
     os.system('clear')

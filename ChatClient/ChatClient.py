@@ -35,7 +35,7 @@ class Backend(threading.Thread):
 
     def __boot(self, output = None):
         self.__socket = self.__ctx.socket(zmq.SUB)
-        self.__socket.setsockopt(zmq.SUBSCRIBE, "")
+        #self.__socket.setsockopt(zmq.SUBSCRIBE, "")
         if output == None:
             self.__print_message = tprint
         else:
@@ -50,6 +50,13 @@ class Backend(threading.Thread):
         except:
             print "failed to connect backend to " + url
 
+    def subscribe(self, RoomID):
+        tprint("Subscribed to room: " + RoomID)
+        self.__socket.setsockopt(zmq.SUBSCRIBE, RoomID)
+
+    def unsubscribe(self, RoomID):
+        self.__socket.setsockopt(zmq.SUBSCRIBE, RoomID)
+
     def __is_running(self):
         return self.__running
 
@@ -58,8 +65,8 @@ class Backend(threading.Thread):
 
     def process_message(self, message):
         try:
-            message = json.loads(message)
-            print message
+            json0 = message.find('{')
+            message = json.loads(message[json0:])
             text = message["message"]
             text = message["from"] + ": " + text
             self.__print_message(text)
@@ -145,15 +152,16 @@ class ChatClient():
     def is_connected(self):
         return self.__connected
 
-    def get_room_list(self):
-        room_list = self.__ns.get_room_list()
-        return room_list
+    def list_rooms(self):
+        room_list = self.__ns.list_rooms()
+        print_rooms(room_list)
 
     def enter_room(self, RoomID):
         server = self.__ns.enter_room(RoomID, self.__username)
         try:
             self.connect(server["host"], server["pull_port"], server["pub_port"])
             self.__current_room = RoomID
+            self.__backend.subscribe(RoomID)
             return True
         except:
             print "failed to connect to server"
@@ -164,6 +172,7 @@ class ChatClient():
             self.disconnect()
             self.__ns.leave_room(self.__username)
             self.__current_room = None
+            self.__backend.unsubscribe(RoomID)
             return True
         except:
             return False
@@ -188,6 +197,7 @@ class ChatClient():
             if cmd == "/exit":
                 End = True
                 self.leave_room()
+                os.system('clear')
             else:
                 self.send_message(cmd)
 
@@ -209,13 +219,13 @@ class ChatClient():
             if cmd == "X":
                 End = True
             elif cmd == "L":
-                rooms = self.__ns.get_room_list()
-                print_rooms(rooms)
+                self.list_rooms()
             elif cmd == "E":
                 roomID = raw_input("RoomID> ")
                 if self.__registered:
                     if roomID != "":
                         self.enter_room(roomID)
+                        #os.system('clear')
                         print "Room " + roomID
                         self.room()
                     else:
@@ -235,7 +245,7 @@ def main():
         server.run()
 
     server.stop()
-    #os.system('clear')
+    os.system('clear')
 
 if __name__ == '__main__':
     main()

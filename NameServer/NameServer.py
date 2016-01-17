@@ -1,8 +1,17 @@
 import Pyro4
+from uuid import uuid4
 
-servers = []
+servers = {}
 rooms = {}
 users = {}
+
+def remove_server(server_id):
+    try:
+        del servers[server_id]
+        return True
+    except:
+        print "failed to remove server"
+        return False
 
 def add_server(host, pull_port, pub_port):
     new_server = {}
@@ -11,22 +20,22 @@ def add_server(host, pull_port, pub_port):
         new_server["pull_port"] = int(pull_port)
         new_server["pub_port"]  = int(pub_port)
         new_server["rooms"]     = []
-        servers.append(new_server)
+        id = str(uuid4())
+        servers[id] = new_server
+        return id
     except:
         print "failed to add server " + host + ":" + str(pull_port) + "/" + str(pub_port) + " to list"
 
 def best_server():
     best = 1000
-    best_index =-1
-    index = 0
-    for index in range(len(servers)):
-        server = servers[index]
+    best_server = None
+    for serverID in servers:
+        server = servers[serverID]
         n_rooms = len(server["rooms"])
         if best == -1 or best > n_rooms:
             best = n_rooms
-            best_index = index
-        index += 1
-    return servers[best_index]
+            best_server = serverID
+    return best_server
 
 class NameServerForClients(object):
     def __init__(self):
@@ -46,48 +55,51 @@ class NameServerForClients(object):
         user = users[username]
         user["status"] = "OFF"
 
-    def get_room_list(self):
+    def list_rooms(self):
         return rooms.keys()
 
-    def leave_room(self, RoomID):
-        room = rooms[RoomID]
-        room["users"].remove(username)
-        if not room["users"]:
-            server = room["server"]
-            server["rooms"].remove(RoomID)
-            room["server"] = None
-
     def enter_room(self, RoomID, username):
-        server = best_server()
         try:
             room = rooms[RoomID]
-            server = room["server"]
+            serverID = room["server"]
+            server = servers[serverID]
             room["users"].append(username)
         except:
+            serverID = best_server()
+            server = servers[serverID]
             rooms[RoomID] = {}
             room = rooms[RoomID]
             room["users"] = [username]
             room["server"] = server
             server["rooms"].append(RoomID)
+
+        user = users[username]
+        user["current_room"] = RoomID
+        user["current_server"] = serverID
+
         return server
+
+    def leave_room(self, RoomID, username):
+        room = rooms[RoomID]
+        room["users"].remove(username)
+        room["current_room"] = None
+        room["current_server"] = None
+
+        if not room["users"]:
+            server = room["server"]
+            server["rooms"].remove(RoomID)
+            room["server"] = None
 
 class NameServerForServers(object):
     def __init__(self):
-        self.__registered = False
+        pass
 
     def register(self, host, pull_port, pub_port):
-        self.__host      = host
-        self.__pull_port = pull_port
-        self.__pub_port  = pub_port
-        add_server(host, pull_port, pub_port)
-        #enviar para a base de dados, webserver e/ou meter no dicionario
-        self.__registered = True
+        return add_server(host, pull_port, pub_port)
 
-    def unregister(self):
-        self.__registered = False
-
-    def is_registered(self):
-        return self.__registered
+    def unregister(self, server_id):
+        #rebalancear as salas
+        return remove_server(server_id)
 
 def main():
     Server_NS = NameServerForServers()

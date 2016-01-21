@@ -1,17 +1,36 @@
+#NameServer
+
 import Pyro4
 from uuid import uuid4
+import requests, json
 
 servers = {}
 rooms = {}
 users = {}
 
-def remove_server(server_id):
+DEBUG = True
+
+def send_to_database(method, url, data = None):
     try:
-        del servers[server_id]
-        return True
-    except:
-        print "failed to remove server"
+        if data and url and (method == "POST" or method == "PUT"):
+            r = requests.request(method, url, json = data)
+            if r.text == "OK":
+                return True
+            else:
+                print r.text
+                return False
+        else:
+            return False
+    except Exception as e:
+        print e
         return False
+
+def get_from_database(url):
+    try:
+        r = requests.get(url)
+        return json.loads(r.text)
+    except:
+        return None
 
 def add_server(host, pull_port, pub_port):
     new_server = {}
@@ -19,83 +38,125 @@ def add_server(host, pull_port, pub_port):
         new_server["host"]      = host
         new_server["pull_port"] = int(pull_port)
         new_server["pub_port"]  = int(pub_port)
+        id                      = str(uuid4())
         new_server["rooms"]     = []
-        id = str(uuid4())
-        servers[id] = new_server
-        return id
+        servers[id]             = new_server
+        new_server["ServerID"]  = id
+        return new_server
     except:
-        print "failed to add server " + host + ":" + str(pull_port) + "/" + str(pub_port) + " to list"
+        if DEBUG:
+            print "failed to create server"
+        return None
 
-def best_server():
-    best = 1000
-    best_server = None
-    for serverID in servers:
-        server = servers[serverID]
-        n_rooms = len(server["rooms"])
-        if best == -1 or best > n_rooms:
-            best = n_rooms
-            best_server = serverID
-    return best_server
+def remove_server(server_id):
+    try:
+        del servers[server_id]
+        return True
+    except:
+        if DEBUG:
+            print "failed to remove server: " + server_id
+        return False
+
+def best_server(server_list):
+    best = -1
+    best_server = ""
+    try:
+        for ServerID, server in server_list.iteritems():
+            n_rooms = len(server["rooms"])
+            if best == -1 or best > n_rooms:
+                best = n_rooms
+                best_server = ServerID
+        return best_server
+    except:
+        return ""
 
 class NameServerForClients(object):
     def __init__(self):
-        pass
+        self.__db_url = "http://localhost:7000/nameserver"
 
     def register(self, username):
         try:
             user = users[username]
+            user["status"] = "ON"
+            send_to_database("PUT", self.__db_url + "/users/", user)
         except:
             users[username] = {}
             user = users[username]
             user["current_server"] = None
             user["current_room"] = None
-        user["status"] = "ON"
+            user["status"] = "ON"
+            user["username"] = username
+            send_to_database("POST", self.__db_url + "/users/", user)
 
     def unregister(self, username):
         user = users[username]
         user["status"] = "OFF"
+        send_to_database("PUT", self.__db_url + "/users/", user)
 
     def list_rooms(self):
-        return rooms.keys()
+      	rooms = get_from_database(self.__db_url + "/rooms/")
+        return rooms
 
     def enter_room(self, RoomID, username):
         try:
+            rooms = get_from_database(self.__db_url + "/rooms/" + RoomID)
+            print "Rooms: "
+            print rooms
             room = rooms[RoomID]
-            serverID = room["server"]
-            server = servers[serverID]
+            ServerID = room["server"]
+            server = servers[ServerID]
             room["users"].append(username)
+            send_to_database("PUT", self.__db_url + "/rooms/", room)
         except:
-            serverID = best_server()
-            server = servers[serverID]
-            rooms[RoomID] = {}
-            room = rooms[RoomID]
-            room["users"] = [username]
-            room["server"] = server
-            server["rooms"].append(RoomID)
-
+            try:
+                servers = get_from_database(self.__db_url + "/servers/")
+                ServerID = best_server(servers)
+                server = servers[ServerID]
+                new_room = {}
+                new_room["users"] = [username]
+                new_room["server"] = ServerID
+                new_room["RoomID"] = RoomID
+                print send_to_database("POST", self.__db_url + "/rooms/", new_room)
+            except Exception as e:
+                print e
+                return None
         user = users[username]
         user["current_room"] = RoomID
-        user["current_server"] = serverID
+        user["current_server"] = ServerID
 
         return server
 
     def leave_room(self, RoomID, username):
         room = rooms[RoomID]
         room["users"].remove(username)
-        room["current_room"] = None
-        room["current_server"] = None
+        user = users[username]
+        user["current_room"] = None
+        user["current_server"] = None
+        #send_to_database()
 
         if not room["users"]:
-            server = room["server"]
+            #fazer isto no webserver
+            ServerID = room["server"]
+            server = servers[ServerID]
             server["rooms"].remove(RoomID)
             room["server"] = None
+        else:
+        	pass
 
 class NameServerForServers(object):
     def __init__(self):
-        pass
+        self.__db_url = "http://localhost:7000/nameserver"
 
     def register(self, host, pull_port, pub_port):
-        return add_server(host, pull_port, pub_port)
+        #rebalancear as salas
+        try:
+            server = add_server(host, pull_port, pub_port)
+            send_to_database("POST", self.__db_url + "/servers/", server)
+            return server["ServerID"]
+        except:
+            if DEBUG:
+                print "failed to add server to the database"
+            return False
 
     def unregister(self, server_id):
         #rebalancear as salas

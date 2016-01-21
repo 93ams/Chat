@@ -51,7 +51,6 @@ class Backend(threading.Thread):
             print "failed to connect backend to " + url
 
     def subscribe(self, RoomID):
-        tprint("Subscribed to room: " + RoomID)
         self.__socket.setsockopt(zmq.SUBSCRIBE, RoomID)
 
     def unsubscribe(self, RoomID):
@@ -137,12 +136,16 @@ class ChatClient():
         return self.__registered
 
     def connect(self, host, frontend_port, backend_port):
-        self.__frontend = Frontend(self.__ctx)
-        self.__frontend.connect(host, frontend_port)
-        self.__backend = Backend(self.__ctx, self.__output)
-        self.__backend.connect(host, backend_port)
-        self.__backend.start()
-        self.__connected = True
+        try:
+            self.__frontend = Frontend(self.__ctx)
+            self.__frontend.connect(host, frontend_port)
+            self.__backend = Backend(self.__ctx, self.__output)
+            self.__backend.connect(host, backend_port)
+            self.__backend.start()
+            self.__connected = True
+            return True
+        except:
+            return False
 
     def disconnect(self):
         self.__frontend.stop()
@@ -159,10 +162,14 @@ class ChatClient():
     def enter_room(self, RoomID):
         server = self.__ns.enter_room(RoomID, self.__username)
         try:
-            self.connect(server["host"], server["pull_port"], server["pub_port"])
-            self.__current_room = RoomID
-            self.__backend.subscribe(RoomID)
-            return True
+            if self.connect(server["host"], server["pull_port"], server["pub_port"]):
+                self.__current_room = RoomID
+                self.__backend.subscribe(RoomID)
+                return True
+            else:
+                if DEBUG:
+                    print "Failed to enter room: " + RoomID
+                return False
         except:
             print "failed to connect to server"
             return False
@@ -184,7 +191,7 @@ class ChatClient():
             message = {
                 "message": message,
                 "from": self.__username,
-                "to": to
+                "RoomID": to
             }
             self.__frontend.send(json.dumps(message))
         except:
@@ -224,10 +231,10 @@ class ChatClient():
                 roomID = raw_input("RoomID> ")
                 if self.__registered:
                     if roomID != "":
-                        self.enter_room(roomID)
-                        #os.system('clear')
-                        print "Room " + roomID
-                        self.room()
+                        if self.enter_room(roomID):
+                            #os.system('clear')
+                            print "Room " + roomID
+                            self.room()
                     else:
                         print "invalid room ID"
                 else:

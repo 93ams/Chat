@@ -1,6 +1,7 @@
 import json
 import os
 import Pyro4
+import requests
 import sys
 import threading
 import zmq
@@ -10,6 +11,20 @@ DEBUG = True
 def tprint(msg):
     sys.stdout.write(msg + '\n> ')
     sys.stdout.flush()
+
+def send_to_database(url, data = None):
+    try:
+        if data:
+            r = requests.post(url, json = data)
+            if r.text == "OK":
+                return True
+            else:
+                print r.text
+                return False
+        else:
+            return False
+    except:
+        return False
 
 def find_a_port(socket, starting_port):
     port = starting_port
@@ -28,14 +43,17 @@ class Worker(threading.Thread):
         self.__pull = pull_socket
         self.__push = push_socket
         self.__pub  = publish_socket
+        self.__db_url = None
+
+    def set_database_url(self, url):
+        self.__db_url = url
 
     def send_message(self, data):
         try:
             msg = {}
             msg["from"] = data["from"]
             msg["message"] = data["message"]
-            msg = data["to"] + ' ' + json.dumps(msg)
-            tprint(msg)
+            msg = data["RoomID"] + ' ' + json.dumps(msg)
             self.__pub.send_string(msg)
         except:
             self.__pub.send_string(data)
@@ -44,6 +62,10 @@ class Worker(threading.Thread):
         msg = self.__pull.recv()
         try:
             msg = json.loads(msg)
+            if self.__db_url:
+                print "url: " + self.__db_url
+                print send_to_database(self.__db_url + "/messages/", msg)
+            print msg
         except:
             pass
         return msg
@@ -65,6 +87,7 @@ class ChatServer():
 
     def __setup_worker(self):
         self.__worker = Worker(self.__pull_socket, self.__push_socket, self.__publish_socket)
+        self.__worker.set_database_url("http://localhost:7000/server")
 
     def __boot(self):
         self.__ctx = zmq.Context()
@@ -89,6 +112,7 @@ class ChatServer():
         try:
             self.__ns = Pyro4.Proxy("PYRONAME:nameserver.servers")
             self.__id = self.__ns.register(self.__host, self.__pull_port, self.__pub_port)
+            self.__worker.set_db_url = self.__ns.get_db_url()
             self.__registered = True
             return True
         except:
@@ -132,6 +156,7 @@ class ChatServer():
 def main():
     os.system('clear')
     server = ChatServer()
+
     if server.register("localhost", 7999) or DEBUG:
         server.start()
     else:

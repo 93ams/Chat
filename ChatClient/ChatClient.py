@@ -6,7 +6,7 @@ import sys
 import threading
 import zmq
 
-DEBUG = True
+DEBUG = False
 
 def tprint(msg):
     sys.stdout.write(msg + '\n> ')
@@ -128,7 +128,6 @@ class ChatClient():
             self.__username = username
             self.__ns = Pyro4.Proxy("PYRONAME:nameserver.clients")
             if self.__ns.register(username):
-                print "PASCOA"
                 self.__registered = True
                 return True
             else:

@@ -5,18 +5,12 @@ import Pyro4
 from uuid import uuid4
 import requests, json
 
-servers = {}
-rooms = {}
-users = {}
-
-DEBUG = True
+DEBUG = False
 
 def send_to_database(method, url, data = None):
     try:
         if data and url and (method == "POST" or method == "PUT"):
             r = requests.request(method, url, json = data)
-            print "Response: "
-            print r.text
             if r.text == "OK":
                 return True
             else:
@@ -52,7 +46,6 @@ def add_server(host, pull_port, pub_port):
         new_server["pub_port"]  = int(pub_port)
         id                      = str(uuid4())
         new_server["rooms"]     = []
-        servers[id]             = new_server
         new_server["ServerID"]  = id
         return new_server
     except:
@@ -88,7 +81,8 @@ class NameServerForClients(object):
 
     def register(self, username):
         if username:
-            if get_from_database(self.__db_url + "/users/" + str(username)):
+            user = get_from_database(self.__db_url + "/users/" + str(username))
+            if user:
                 data = {}
                 data["command"] = "login"
                 try:
@@ -98,14 +92,13 @@ class NameServerForClients(object):
                     if DEBUG:
                         print e
             else:
-                users[username] = {}
-                user = users[username]
-                user["current_server"] = None
-                user["current_room"] = None
-                user["status"] = "ON"
-                user["username"] = username
+                new_user = {}
+                new_user["current_server"] = None
+                new_user["current_room"] = None
+                new_user["status"] = "ON"
+                new_user["username"] = username
                 try:
-                    if send_to_database("POST", self.__db_url + "/users/", user):
+                    if send_to_database("POST", self.__db_url + "/users/", new_user):
                         return True
                 except Exception as e:
                     if DEBUG:

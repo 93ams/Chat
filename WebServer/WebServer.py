@@ -23,18 +23,18 @@ class MainPage(webapp2.RequestHandler):
         s += '</p>'
 
         if users:
-            s = '<h3>Users:</h3>'
+            s += '<h3>Users:</h3>'
             for username in users.keys():
                 s += '<p>'
                 s += '<h4>User: ' + username + ' </h4>'
-                s += '<a href="html/' + username + '/users/count">Number of messages of user: ' + username + ' </a> &nbsp '
-                s += '<a href="html/' + username + '/users">List of messages of user: ' + username + ' </a> &nbsp '
+                s += '<a href="html/users/' + username + '/messages/count">Number of messages of user: ' + username + ' </a> &nbsp '
+                s += '<a href="html/users/' + username + '/messages">List of messages of user: ' + username + ' </a> &nbsp '
                 s += '</p>'
         else:
-            s = '<h3>No User Exist, Yet</h3>'
+            s += '<h3>No User Exist, Yet</h3>'
 
         if rooms:
-            s = '<h3>Rooms:</h3>'
+            s += '<h3>Rooms:</h3>'
             for RoomID in rooms.keys():
                 s += '<p>'
                 s += '<h4>Room: ' + RoomID + ' </h4>'
@@ -44,7 +44,7 @@ class MainPage(webapp2.RequestHandler):
                 s += '<a href="html/' + RoomID + '/messages">List of messages in room: ' + RoomID + ' </a> &nbsp '
                 s += '</p>'
         else:
-            s = '<h3>No Room Exist, Yet</h3>'
+            s += '<h3>No Room Exist, Yet</h3>'
         self.response.write(s)
 
 ###################### WebClient #####################
@@ -86,44 +86,67 @@ class UsersList(webapp2.RequestHandler):
                 self.response.write('There is no user connected')
 
 class MessagesCount(webapp2.RequestHandler):
-    def get(self, RoomID):
+    def get(self, RoomID = None, Username = None):
         if RoomID:
             try:
-            	room = rooms[str(RoomID)]
-            	number_of_messages = len(room["messages"])
+                number_of_messages = 0
+                for OuterID, message in messages.iteritems():
+                    if message["RoomID"] == str(RoomID):
+                        number_of_messages += 1
                 if number_of_messages != 0:
                     self.response.write('Number of messages sent: ' + str(number_of_messages))
                 else:
                     self.response.write('No message has been sent in this room, yet')
             except:
                 self.response.write("This group doesn't exist, yet")
+        elif Username:
+            try:
+                number_of_messages = 0
+                for OuterID, message in messages.iteritems():
+                    if message["from"] == str(Username):
+                        number_of_messages += 1
+                if message_list:
+                    self.response.write('Number of messages sent: ' + str(number_of_messages))
+                else:
+                    self.response.write('No message has been sent by this user, yet')
+            except:
+                self.response.write("User doesn't exist, yet")
         else:
-            number_of_messages = 0
-            for room in rooms:
-                number_of_messages += len(room["messages"])
-            if DEBUG:
-                print "number of messages: " + str(number_of_messages)
+            number_of_messages = len(messages)
             if number_of_messages:
                 self.response.write('Number of messages sent: ' + str(number_of_messages))
             else:
                 self.response.write('No message has been sent, yet')
 
 class MessagesList(webapp2.RequestHandler):
-    def get(self, RoomID):
+    def get(self, RoomID = None, Username = None):
         if RoomID:
             try:
-                room = rooms[str(RoomID)]
-                if room["messages"]:
+                message_list = []
+                for OuterID, message in messages.iteritems():
+                    if message["RoomID"] == str(RoomID):
+                        message_list.append(message)
+                if message_list:
                     self.response.write('List of messages of room: ' + str(RoomID))
-                    self.response.write(room["messages"])
+                    self.response.write(message_list)
                 else:
                     self.response.write('No message has been sent in this room, yet')
             except:
                 self.response.write("Room doesn't exist, yet")
+        elif Username:
+            try:
+                message_list = []
+                for OuterID, message in messages.iteritems():
+                    if message["from"] == str(Username):
+                        message_list.append(message)
+                if message_list:
+                    self.response.write('List of messages of user: ' + str(Username))
+                    self.response.write(message_list)
+                else:
+                    self.response.write('No message has been sent by this user, yet')
+            except:
+                self.response.write("User doesn't exist, yet")
         else:
-            messages = []
-            for room in rooms:
-                messages.extend(room["messages"])
             if messages:
                 self.response.write('List of messages: ')
                 self.response.write(messages)
@@ -147,7 +170,7 @@ class Servers(webapp2.RequestHandler):
 
     def post(self, ServerID = None):
         try:
-            data =json.loads(self.request.body)
+            data = json.loads(self.request.body)
             ServerID = data["ServerID"]
             new_server = {}
             new_server["host"] = data["host"]
@@ -158,7 +181,6 @@ class Servers(webapp2.RequestHandler):
             self.response.write('OK')
         except Exception as e:
             if DEBUG:
-                print "MERDA"
                 print e
             self.response.write('FAIL')
 
@@ -187,7 +209,7 @@ class Rooms(webapp2.RequestHandler):
 
     def post(self, RoomID = None):
         try:
-            data =json.loads(self.request.body)
+            data = json.loads(self.request.body)
             RoomID = str(data["RoomID"])
             new_room = {}
             new_room["messages"] = []
@@ -205,7 +227,7 @@ class Rooms(webapp2.RequestHandler):
 
     def put(self, RoomID):
         try:
-            data =json.loads(self.request.body)
+            data = json.loads(self.request.body)
             username = str(data["Username"])
             user = users[username]
             room = rooms[str(RoomID)]
@@ -238,7 +260,7 @@ class Users(webapp2.RequestHandler):
 
     def post(self, UserName = None):
         try:
-            data =json.loads(self.request.body)
+            data = json.loads(self.request.body)
             username = str(data["username"])
             new_user = {}
             new_user["current_room"] = None
@@ -251,7 +273,7 @@ class Users(webapp2.RequestHandler):
     def put(self, UserName):
         try:
             user = users[UserName]
-            data =json.loads(self.request.body)
+            data = json.loads(self.request.body)
             command = data["command"]
             if command == "login":
                 user["status"] = "ON"
@@ -269,31 +291,9 @@ class Users(webapp2.RequestHandler):
 ################## Mensages #######################
 
 class Messages(webapp2.RequestHandler):
-    def get(self, RoomID = None, MessageID = None):
-        if RoomID:
-            try:
-                room = rooms[RoomID]
-                messages = room["messages"]
-                if MessageID:
-                    self.response.write(json.dumps(messages[messageID]))
-                else:
-                    self.response.write(json.dumps(messages.values()))
-            except Exception as e:
-                if DEBUG:
-                    print e
-                self.response.write(json.dumps({}))
-        else:
-            if rooms:
-                messages = []
-                for RoomID, room in rooms.iteritems():
-                    messages.extend(room["messages"])
-                self.response.write(json.dumps(messages))
-            else:
-                self.response.write(json.dumps({}))
-
     def post(self, RoomID, MessageID = None):
         try:
-            data =json.loads(self.request.body)
+            data = json.loads(self.request.body)
             room = rooms[RoomID]
             room_messages = room["messages"]
             InnerID = len(room_messages)
@@ -308,14 +308,17 @@ class Messages(webapp2.RequestHandler):
                 print e
             self.response.write('FAIL')
 
-
 app = webapp2.WSGIApplication([
     webapp2.Route(r'/', MainPage),
 
-    webapp2.Route(r'/html/users', UsersList),
+    webapp2.Route(r'/html/users/', UsersList),
     webapp2.Route(r'/html/users/count', UsersCount),
     webapp2.Route(r'/html/<RoomID:\w+>/users/count', UsersCount),
     webapp2.Route(r'/html/<RoomID:\w+>/users', UsersList),
+    webapp2.Route(r'/html/messages', MessagesList),
+    webapp2.Route(r'/html/messages/count', MessagesCount),
+    webapp2.Route(r'/html/users/<Username:\w+>/messages', MessagesList),
+    webapp2.Route(r'/html/users/<Username:\w+>/messages/count', MessagesCount),
     webapp2.Route(r'/html/<RoomID:\w+>/messages/count', MessagesCount),
     webapp2.Route(r'/html/<RoomID:\w+>/messages', MessagesList),
 

@@ -21,7 +21,7 @@ def send_to_database(url, data = None):
                 return True
             else:
                 if DEBUG:
-                    print r.text
+                    tprint(r.text)
                 return False
         else:
             return False

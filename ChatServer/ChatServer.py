@@ -1,3 +1,4 @@
+ #!/usr/bin/env python
 import json
 import os
 import Pyro4
@@ -19,11 +20,14 @@ def send_to_database(url, data = None):
             if r.text == "OK":
                 return True
             else:
-                print r.text
+                if DEBUG:
+                    print r.text
                 return False
         else:
             return False
-    except:
+    except Exception as e:
+        if DEBUG:
+            print e
         return False
 
 def find_a_port(socket, starting_port):
@@ -54,18 +58,21 @@ class Worker(threading.Thread):
             msg["from"] = data["from"]
             msg["message"] = data["message"]
             msg = data["RoomID"] + ' ' + json.dumps(msg)
+            if self.__db_url:
+                RoomID = data["RoomID"]
+                try:
+                    send_to_database(self.__db_url + "/" + RoomID +  "/messages", data)
+                except Exception as e:
+                    if DEBUG:
+                        print e
             self.__pub.send_string(msg)
         except:
-            self.__pub.send_string(data)
+            self.__pub.send_string(msg)
 
     def recv_message(self):
         msg = self.__pull.recv()
         try:
             msg = json.loads(msg)
-            if self.__db_url:
-                print "url: " + self.__db_url
-                print send_to_database(self.__db_url + "/messages/", msg)
-            print msg
         except:
             pass
         return msg

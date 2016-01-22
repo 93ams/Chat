@@ -1,3 +1,4 @@
+ #!/usr/bin/env python
 import json
 import os
 import Pyro4
@@ -27,8 +28,9 @@ def def_username():
             return username
 
 class Backend(threading.Thread):
-    def __init__(self, ctx, output = None):
+    def __init__(self, username, ctx, output = None):
         super(Backend, self).__init__ ()
+        self.__username = username
         self.__ctx     = ctx
         self.__running = False
         self.__boot(output)
@@ -66,9 +68,10 @@ class Backend(threading.Thread):
         try:
             json0 = message.find('{')
             message = json.loads(message[json0:])
-            text = message["message"]
-            text = message["from"] + ": " + text
-            self.__print_message(text)
+            if message["from"] != self.__username:
+                text = message["message"]
+                text = message["from"] + ": " + text
+                self.__print_message(text)
         except:
             self.__print_message(message)
 
@@ -118,19 +121,31 @@ class ChatClient():
     def register_to_nameserver(self, username, ns_host = "localhost", ns_port = 7999):
         try:
             if username == "":
-                print "Invalid Username"
+                if DEBUG:
+                    print "Invalid Username"
                 return False
             self.__username = username
             self.__ns = Pyro4.Proxy("PYRONAME:nameserver.clients")
-            self.__ns.register(username)
-            self.__registered = True
-            return True
+            if self.__ns.register(username):
+                self.__registered = True
+                return True
+            else:
+                if DEBUG:
+                    print "Unable to connect"
+                return False
         except:
-            print "Unable to connect"
+            if DEBUG:
+                print "Unable to connect"
             return False
 
     def unregister(self):
-        self.__ns.unregister(self.__username)
+        if self.__username:
+            if self.__ns.unregister(self.__username):
+                return True
+            else:
+                print "Unable to logout"
+        else:
+            print "You are not logged, yet"
 
     def is_registered(self):
         return self.__registered
@@ -139,7 +154,7 @@ class ChatClient():
         try:
             self.__frontend = Frontend(self.__ctx)
             self.__frontend.connect(host, frontend_port)
-            self.__backend = Backend(self.__ctx, self.__output)
+            self.__backend = Backend(self.__username, self.__ctx, self.__output)
             self.__backend.connect(host, backend_port)
             self.__backend.start()
             self.__connected = True
@@ -148,9 +163,13 @@ class ChatClient():
             return False
 
     def disconnect(self):
-        self.__frontend.stop()
-        self.__backend.stop()
-        self.__connected = False
+        try:
+            self.__frontend.stop()
+            self.__backend.stop()
+            self.__connected = False
+            return True
+        except:
+            return False
 
     def is_connected(self):
         return self.__connected
@@ -194,8 +213,9 @@ class ChatClient():
                 "RoomID": to
             }
             self.__frontend.send(json.dumps(message))
+            return True
         except:
-            pass
+            return False
 
     def room(self):
         End = False
@@ -205,8 +225,10 @@ class ChatClient():
                 End = True
                 self.leave_room()
                 os.system('clear')
-            else:
-                self.send_message(cmd)
+            elif cmd != "":
+
+                if not self.send_message(cmd):
+                    tprint("Unable to send message!")
 
     def stop(self):
         if self.__registered:
@@ -232,7 +254,7 @@ class ChatClient():
                 if self.__registered:
                     if roomID != "":
                         if self.enter_room(roomID):
-                            #os.system('clear')
+                            os.system('clear')
                             print "Room " + roomID
                             self.room()
                     else:
@@ -252,7 +274,7 @@ def main():
         server.run()
 
     server.stop()
-    os.system('clear')
+    os.system('reset')
 
 if __name__ == '__main__':
     main()

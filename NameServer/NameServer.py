@@ -1,3 +1,4 @@
+ #!/usr/bin/env python
 #NameServer
 
 import Pyro4
@@ -17,19 +18,25 @@ def send_to_database(method, url, data = None):
             if r.text == "OK":
                 return True
             else:
-                print r.text
+                if DEBUG:
+                    print r.text
                 return False
         else:
             return False
     except Exception as e:
-        print e
+        if DEBUG:
+            print e
         return False
 
 def get_from_database(url):
     try:
         r = requests.get(url)
-        return json.loads(r.text)
-    except:
+        print r.text
+        data = json.loads(r.text)
+        return data
+    except Exception as e:
+        if DEBUG:
+            print e
         return None
 
 def add_server(host, pull_port, pub_port):
@@ -48,9 +55,9 @@ def add_server(host, pull_port, pub_port):
             print "failed to create server"
         return None
 
-def remove_server(server_id):
+def remove_server(url, serverID):
     try:
-        del servers[server_id]
+        r = requests.delete(url + "/serverID")
         return True
     except:
         if DEBUG:
@@ -76,72 +83,85 @@ class NameServerForClients(object):
 
     def register(self, username):
         try:
-            user = users[username]
-            user["status"] = "ON"
-            send_to_database("PUT", self.__db_url + "/users/", user)
+            if username:
+                if get_from_database(self.__db_url + "/users/" + str(username)):
+                    data["command"] = "login"
+                    data["user"] = username
+                    print send_to_database("PUT", self.__db_url + "/users/", data)
+                else:
+                    users[username] = {}
+                    user = users[username]
+                    user["current_server"] = None
+                    user["current_room"] = None
+                    user["status"] = "ON"
+                    user["username"] = username
+                    print send_to_database("POST", self.__db_url + "/users/", user)
+                return True
+            return False
         except:
-            users[username] = {}
-            user = users[username]
-            user["current_server"] = None
-            user["current_room"] = None
-            user["status"] = "ON"
-            user["username"] = username
-            send_to_database("POST", self.__db_url + "/users/", user)
+            return False
 
     def unregister(self, username):
-        user = users[username]
-        user["status"] = "OFF"
-        send_to_database("PUT", self.__db_url + "/users/", user)
+        if username:
+            data = {}
+            try:
+                user = users[username]
+                data["command"] = "logout"
+                send_to_database("PUT", self.__db_url + "/users/", user)
+            except Exception as e:
+                print e
 
     def list_rooms(self):
       	rooms = get_from_database(self.__db_url + "/rooms/")
         return rooms
 
     def enter_room(self, RoomID, username):
-        try:
-            rooms = get_from_database(self.__db_url + "/rooms/" + RoomID)
-            print "Rooms: "
-            print rooms
-            room = rooms[RoomID]
-            ServerID = room["server"]
-            server = servers[ServerID]
-            room["users"].append(username)
-            send_to_database("PUT", self.__db_url + "/rooms/", room)
-        except:
+        if RoomID:
             try:
-                servers = get_from_database(self.__db_url + "/servers/")
-                ServerID = best_server(servers)
-                server = servers[ServerID]
-                new_room = {}
-                new_room["users"] = [username]
-                new_room["server"] = ServerID
-                new_room["RoomID"] = RoomID
-                print send_to_database("POST", self.__db_url + "/rooms/", new_room)
-            except Exception as e:
-                print e
-                return None
-        user = users[username]
-        user["current_room"] = RoomID
-        user["current_server"] = ServerID
-
-        return server
+                data = {}
+                room = get_from_database(self.__db_url + "/rooms/" + str(RoomID))
+                ServerID = room["server"]
+                print self.__db_url + "/servers/" + ServerID
+                server = get_from_database(self.__db_url + "/servers/" + ServerID)
+                print "Server"
+                print server
+                if not server:
+                    return None
+                data["Username"] = username
+                data["command"] = "enter"
+                send_to_database("PUT", self.__db_url + "/rooms/" + str(RoomID), data)
+            except:
+                try:
+                    servers = get_from_database(self.__db_url + "/servers/")
+                    if not servers:
+                        return None
+                    ServerID = best_server(servers)
+                    server = servers[ServerID]
+                    new_room = {}
+                    new_room["users"] = [username]
+                    new_room["server"] = ServerID
+                    new_room["RoomID"] = str(RoomID)
+                    send_to_database("POST", self.__db_url + "/rooms/", new_room)
+                except Exception as e:
+                    if DEBUG:
+                        print e
+                    return None
+            return server
+        else:
+            return None
 
     def leave_room(self, RoomID, username):
-        room = rooms[RoomID]
-        room["users"].remove(username)
-        user = users[username]
-        user["current_room"] = None
-        user["current_server"] = None
-        #send_to_database()
-
-        if not room["users"]:
-            #fazer isto no webserver
-            ServerID = room["server"]
-            server = servers[ServerID]
-            server["rooms"].remove(RoomID)
-            room["server"] = None
-        else:
-        	pass
+        try:
+            if RoomID and username:
+                data = {}
+                data["Username"] = username
+                data["command"] = "exit"
+                send_to_database("PUT", self.__db_url + "/rooms/" + RoomID , data)
+    	        return True
+            else:
+                return False
+        except:
+            return False
 
 class NameServerForServers(object):
     def __init__(self):
@@ -156,11 +176,16 @@ class NameServerForServers(object):
         except:
             if DEBUG:
                 print "failed to add server to the database"
-            return False
+            return None
 
     def unregister(self, server_id):
         #rebalancear as salas
-        return remove_server(server_id)
+        if remove_server(self.__db_url, server_id):
+            return True
+        else:
+            if DEBUG:
+                print "failed to add server to the database"
+            return False
 
 def main():
     Server_NS = NameServerForServers()

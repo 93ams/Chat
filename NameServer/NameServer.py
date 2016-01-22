@@ -15,25 +15,27 @@ def send_to_database(method, url, data = None):
     try:
         if data and url and (method == "POST" or method == "PUT"):
             r = requests.request(method, url, json = data)
+            print "Response: "
+            print r.text
             if r.text == "OK":
                 return True
             else:
                 if DEBUG:
+                    print "Start"
                     print url
                     print data
                     print r.text
-                return False
-        else:
-            return False
+                    print "End"
     except Exception as e:
         if DEBUG:
             print e
-        return False
+    return False
 
 def get_from_database(url):
     try:
         r = requests.get(url)
-        print r.text
+        if DEBUG:
+            print r.text
         data = json.loads(r.text)
         return data
     except Exception as e:
@@ -188,9 +190,9 @@ class NameServerForServers(object):
             server = add_server(host, pull_port, pub_port)
             send_to_database("POST", self.__db_url + "/servers/", server)
             return server["ServerID"]
-        except:
+        except Exception as e:
             if DEBUG:
-                print "failed to add server to the database"
+                print e
             return None
 
     def unregister(self, server_id):

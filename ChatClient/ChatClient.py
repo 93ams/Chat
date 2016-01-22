@@ -49,6 +49,7 @@ class Backend(threading.Thread):
         try:
             url = "tcp://" + host + ":" + str(port)
             self.__socket.connect(url)
+            self.__socket.setsockopt(zmq.SUBSCRIBE, "__")
         except:
             print "failed to connect backend to " + url
 
@@ -127,15 +128,16 @@ class ChatClient():
             self.__username = username
             self.__ns = Pyro4.Proxy("PYRONAME:nameserver.clients")
             if self.__ns.register(username):
+                print "PASCOA"
                 self.__registered = True
                 return True
             else:
                 if DEBUG:
-                    print "Unable to connect"
+                    print "Unable to connect to nameserver"
                 return False
         except:
             if DEBUG:
-                print "Unable to connect"
+                print "Unable to connect to nameserver"
             return False
 
     def unregister(self):
@@ -274,7 +276,7 @@ def main():
         server.run()
 
     server.stop()
-    os.system('reset')
+    #os.system('reset')
 
 if __name__ == '__main__':
     main()

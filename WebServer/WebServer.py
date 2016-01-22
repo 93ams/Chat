@@ -1,10 +1,8 @@
  #!/usr/bin/env python
+
+import json
 import webapp2
 from webapp2_extras import routes
-import json
-
-#from google.appengine.ext import webapp
-#from google.appengine.ext.webapp.util import run_wsgi_app
 
 users    = {}
 messages = {}
@@ -149,7 +147,7 @@ class Servers(webapp2.RequestHandler):
 
     def post(self, ServerID = None):
         try:
-            data = self.request.json
+            data =json.loads(self.request.body)
             ServerID = data["ServerID"]
             new_server = {}
             new_server["host"] = data["host"]
@@ -160,6 +158,7 @@ class Servers(webapp2.RequestHandler):
             self.response.write('OK')
         except Exception as e:
             if DEBUG:
+                print "MERDA"
                 print e
             self.response.write('FAIL')
 
@@ -188,7 +187,7 @@ class Rooms(webapp2.RequestHandler):
 
     def post(self, RoomID = None):
         try:
-            data = self.request.json
+            data =json.loads(self.request.body)
             RoomID = str(data["RoomID"])
             new_room = {}
             new_room["messages"] = []
@@ -206,7 +205,7 @@ class Rooms(webapp2.RequestHandler):
 
     def put(self, RoomID):
         try:
-            data = self.request.json
+            data =json.loads(self.request.body)
             username = str(data["Username"])
             user = users[username]
             room = rooms[str(RoomID)]
@@ -216,8 +215,6 @@ class Rooms(webapp2.RequestHandler):
                 self.response.write('OK')
             elif command == "exit":
                 user["current_room"] = None
-                print "User " + username + " is leaving room " + str(RoomID)
-                print user
                 self.response.write('OK')
             else:
                 self.response.write('FAIL')
@@ -241,10 +238,11 @@ class Users(webapp2.RequestHandler):
 
     def post(self, UserName = None):
         try:
-            data = self.request.json
-            username = data["username"]
+            data =json.loads(self.request.body)
+            username = str(data["username"])
             new_user = {}
             new_user["current_room"] = None
+            new_user["status"] = "ON"
             users[username] = new_user
             self.response.write('OK')
         except:
@@ -253,7 +251,7 @@ class Users(webapp2.RequestHandler):
     def put(self, UserName):
         try:
             user = users[UserName]
-            data = self.request.json
+            data =json.loads(self.request.body)
             command = data["command"]
             if command == "login":
                 user["status"] = "ON"
@@ -295,7 +293,7 @@ class Messages(webapp2.RequestHandler):
 
     def post(self, RoomID, MessageID = None):
         try:
-            data = self.request.json
+            data =json.loads(self.request.body)
             room = rooms[RoomID]
             room_messages = room["messages"]
             InnerID = len(room_messages)
@@ -311,53 +309,30 @@ class Messages(webapp2.RequestHandler):
             self.response.write('FAIL')
 
 
-if DEBUG:
-    app = webapp2.WSGIApplication([
-        webapp2.Route(r'/', MainPage),
+app = webapp2.WSGIApplication([
+    webapp2.Route(r'/', MainPage),
 
-        webapp2.Route(r'/html/users', UsersList),
-        webapp2.Route(r'/html/users/count', UsersCount),
-        webapp2.Route(r'/html/<RoomID:\w+>/users/count', UsersCount),
-        webapp2.Route(r'/html/<RoomID:\w+>/users', UsersList),
-        webapp2.Route(r'/html/<RoomID:\w+>/messages/count', MessagesCount),
-        webapp2.Route(r'/html/<RoomID:\w+>/messages', MessagesList),
+    webapp2.Route(r'/html/users', UsersList),
+    webapp2.Route(r'/html/users/count', UsersCount),
+    webapp2.Route(r'/html/<RoomID:\w+>/users/count', UsersCount),
+    webapp2.Route(r'/html/<RoomID:\w+>/users', UsersList),
+    webapp2.Route(r'/html/<RoomID:\w+>/messages/count', MessagesCount),
+    webapp2.Route(r'/html/<RoomID:\w+>/messages', MessagesList),
 
-        webapp2.Route(r'/nameserver/servers/<ServerID:[\w-]*>', Servers),
-        webapp2.Route(r'/nameserver/rooms/<RoomID:\w*>', Rooms),
-        webapp2.Route(r'/nameserver/users/<UserName:\w*>', Users),
+    webapp2.Route(r'/nameserver/servers/<ServerID:[\w-]*>', Servers),
+    webapp2.Route(r'/nameserver/rooms/<RoomID:\w*>', Rooms),
+    webapp2.Route(r'/nameserver/users/<UserName:\w*>', Users),
 
-        webapp2.Route(r'/server/messages', Messages),
-        webapp2.Route(r'/server/<RoomID:\w+>/messages', Messages),
-        webapp2.Route(r'/server/<RoomID:\w+>/messages/<MessageID>', Messages),
+    webapp2.Route(r'/server/messages', Messages),
+    webapp2.Route(r'/server/<RoomID:\w+>/messages', Messages),
+    webapp2.Route(r'/server/<RoomID:\w+>/messages/<MessageID>', Messages),
 
-    ], debug=True)
-else:
-    appication = webapp2.WSGIApplication([
-        (r'/', MainPage),
-
-        (r'/html/users', UsersList),
-        (r'/html/users/count', UsersCount),
-        (r'/html/<RoomID:\w+>/users/count', UsersCount),
-        (r'/html/<RoomID:\w+>/users', UsersList),
-        (r'/html/<RoomID:\w+>/messages/count', MessagesCount),
-        (r'/html/<RoomID:\w+>/messages', MessagesList),
-
-        (r'/nameserver/servers/<ServerID:[\w-]*>', Servers),
-        (r'/nameserver/rooms/<RoomID:\w*>', Rooms),
-        (r'/nameserver/users/<UserName:\w*>', Users),
-
-        (r'/server/messages', Messages),
-        (r'/server/<RoomID:\w+>/messages', Messages),
-        (r'/server/<RoomID:\w+>/messages/<MessageID>', Messages),
-
-    ], debug=True)
+], debug=True)
 
 def main():
-    if DEBUG:
-        from paste import httpserver
-        httpserver.serve(app, host='127.0.0.1', port='7000')
-    else:
-        run_wsgi_app(application)
+    from paste import httpserver
+    httpserver.serve(app, host='127.0.0.1', port='7000')
+
 
 if __name__ == '__main__':
     main()

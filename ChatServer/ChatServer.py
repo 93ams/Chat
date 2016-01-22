@@ -119,11 +119,12 @@ class ChatServer():
         try:
             self.__ns = Pyro4.Proxy("PYRONAME:nameserver.servers")
             self.__id = self.__ns.register(self.__host, self.__pull_port, self.__pub_port)
-            self.__worker.set_db_url = self.__ns.get_db_url()
-            self.__registered = True
-            return True
+            if self.__id:
+                self.__registered = True
+                return True
         except:
-            return False
+            pass
+        return False
 
     def start(self):
         self.__worker.start()
@@ -169,7 +170,7 @@ def main():
     else:
         print "Unable to register server"
     server.stop()
-    os.system('clear')
+    #os.system('reset')
 
 if __name__ == '__main__':
     main()

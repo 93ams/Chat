@@ -1,13 +1,14 @@
  #!/usr/bin/env python
 from google.appengine.ext import ndb
-from google.appengine.ext import webapp
-from google.appengine.ext.webapp.util import run_wsgi_app
+import webapp2, json
+
+DEBUG = True
 
 class Server(ndb.Model):
-	serverID=ndb.StringProperty()
-	host=ndb.IntegerProperty()
-	pub_port=ndb.IntegerProperty()
-	post_port=ndb.IntegerProperty()
+	serverID = ndb.StringProperty()
+	host = ndb.StringProperty()
+	pub_port = ndb.IntegerProperty()
+	pull_port = ndb.IntegerProperty()
 
 class Room(ndb.Model):
 	roomId = ndb.StringProperty()
@@ -19,45 +20,73 @@ class User(ndb.Model):
 	Current_server=ndb.IntegerProperty()
 
 class Message(ndb.Model):
-	messageID = ndb.IntegerProperty()
+	innerID = ndb.IntegerProperty()
+	outerID = ndb.IntegerProperty()
 	text = ndb.StringProperty()
 	roomID = ndb.StringProperty()
 	from_user = ndb.StringProperty()
-
-
 
 #Servidor REST
 
 class Servers(webapp2.RequestHandler):
 	def get(self, ServerID = None):
-		if ServerID:
-			pass
-		else:
-			pass
-
-	def post(self, ServerID = None):
-		if ServerID:
-			pass
-		else:
-			try:
-	            data = self.request.json
-			except:
-				pass
+		try:
+			if ServerID:
+				server = Server.query(Server.serverID == ServerID)
+				self.response.write(server.content)
+			else:
+				servers = Server.query()
+				for server in servers:
+					print server
+				self.response.write(servers.content)
+		except:
+			self.response.write({})
+	def post(self):
+		try:
+			server = json.loads(self.request.body)
+			print server
+			new_server = Server(serverID = server.get("ServerID"), host = server.get("host"), pub_port = server.get("pub_port"), pull_port = server.get("pull_port"))
+			print new_server
+			new_server.put()
+			self.response.write("OK")
+		except Exception as e:
+			if DEBUG:
+				print e
+			self.response.write("FAIL")
 
 	def put(self, ServerID):
 		if ServerID:
+			server = Server.query(Server.serverID == ServerID)
 			try:
-	            data = self.request.json
+				data = json.loads(self.request.body)
+				if data.get("host"):
+					server.host = data.get("host")
+				if data.get("pub_port"):
+					server.pub_port = data.get("pub_port")
+				if data.get("pull_port"):
+					server.pull_port = data.get("pull_port")
+				server.put()
+				self.response.write("OK")
 			except:
-				pass
+				self.response.write("FAIL")
 		else:
-			pass
+			self.response.write("FAIL")
 
-	def delete(self, ServerID):
-		if ServerID:
-			pass
-		else:
-			pass
+	def delete(self, ServerID = None):
+		try:
+			if ServerID:
+				server = Server.query(Server.serverID == ServerID)
+				print server
+				print server.fetch
+			else:
+				ndb.delete_multi(
+				    Server.query().fetch()
+				)
+			self.response.write("OK")
+		except Exception as e:
+			if DEBUG:
+				print e
+			self.response.write("FAIL")
 
 class Rooms(webapp2.RequestHandler):
 	def get(self, RoomID = None):
@@ -71,14 +100,14 @@ class Rooms(webapp2.RequestHandler):
 			pass
 		else:
 			try:
-	            data = self.request.json
+				room = json.loads(self.request.body)
 			except:
 				pass
 
 	def put(self, RoomID):
 		if RoomID:
 			try:
-	            data = self.request.json
+				data = json.loads(self.request.body)
 			except:
 				pass
 		else:
@@ -103,14 +132,14 @@ class Users(webapp2.RequestHandler):
 			pass
 		else:
 			try:
-	            data = self.request.json
+				user = json.loads(self.request.body)
 			except:
 				pass
 
 	def put(self, Username):
 		if Username:
 			try:
-	            data = self.request.json
+				data = json.loads(self.request.body)
 			except:
 				pass
 		else:
@@ -134,16 +163,16 @@ class Messages(webapp2.RequestHandler):
 
 	def post(self, RoomID = None, InnerID = None, OuterID = None):
 		try:
-			data = self.request.json
+			message = json.loads(self.request.body)
 		except:
 			pass
 
 	def put(self, RoomID = None, InnerID = None, OuterID = None):
 		if RoomID:
 			if InnerID:
-				pass
+				data = json.loads(self.request.body)
 		elif OuterID:
-			pass
+			data = json.loads(self.request.body)
 		else:
 			pass
 
@@ -156,7 +185,8 @@ class Messages(webapp2.RequestHandler):
 		else:
 			pass
 
-application = webapp2.WSGIApplication([
+app = webapp2.WSGIApplication([
+				(r'/servers', Servers),
 				(r'/servers/<ServerID:[\w-]*>', Servers),
 				(r'/rooms/<RoomID:\w*>', Rooms),
 				(r'/users/<ServerID:\w*>', Users),
@@ -165,7 +195,8 @@ application = webapp2.WSGIApplication([
             ], debug = True)
 
 def main():
-    run_wsgi_app(application)
+    from paste import httpserver
+    httpserver.serve(app, host='127.0.0.1', port='7000')
 
 if __name__ == "__main__":
     main()

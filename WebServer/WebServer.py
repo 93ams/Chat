@@ -3,7 +3,7 @@
 import json
 import webapp2
 from webapp2_extras import routes
-
+from DataBase import DataBase
 users    = {}
 messages = {}
 rooms    = {}
@@ -12,6 +12,8 @@ servers  = {}
 DEBUG = True
 
 #################### WebAppServer ####################
+
+database = DataBase()
 
 class MainPage(webapp2.RequestHandler):
     def get(self):
@@ -28,7 +30,7 @@ class MainPage(webapp2.RequestHandler):
                 s += '<p>'
                 s += '<h4>User: ' + username + ' </h4>'
                 s += '<a href="html/users/' + username + '/messages/count">Number of messages of user: ' + username + ' </a> &nbsp '
-                s += '<a href="html/users/' + username + '/messages">List of messages of user: ' + username + ' </a> &nbsp '
+                s += '<a href="html/users/' + username +'/messages">List of messages of user: ' + username + ' </a> &nbsp '
                 s += '</p>'
         else:
             s += '<h3>No User Exist, Yet</h3>'
@@ -52,6 +54,7 @@ class MainPage(webapp2.RequestHandler):
 class UsersCount(webapp2.RequestHandler):
     def get(self, RoomID = None):
         if RoomID:
+            users = database.users.get()
             users_in_room = 0
             for username, user in users.iteritems():
                 if user["current_room"] == str(RoomID):
@@ -67,7 +70,7 @@ class UsersCount(webapp2.RequestHandler):
             if number_of_users:
                 self.response.write('There are ' + str(number_of_users) + ' connected')
             else:
-                self.response.write('There are no user connected')
+                self.response.write('There are no users, yet')
 
 class UsersList(webapp2.RequestHandler):
     def get(self, RoomID = None):
@@ -109,7 +112,8 @@ class MessagesCount(webapp2.RequestHandler):
                     self.response.write('Number of messages sent: ' + str(number_of_messages))
                 else:
                     self.response.write('No message has been sent by this user, yet')
-            except:
+            except Exception as e:
+                print e
                 self.response.write("User doesn't exist, yet")
         else:
             number_of_messages = len(messages)
@@ -144,7 +148,8 @@ class MessagesList(webapp2.RequestHandler):
                     self.response.write(message_list)
                 else:
                     self.response.write('No message has been sent by this user, yet')
-            except:
+            except Exception as e:
+                print e
                 self.response.write("User doesn't exist, yet")
         else:
             if messages:
@@ -178,6 +183,7 @@ class Servers(webapp2.RequestHandler):
             new_server["pull_port"] = data["pull_port"]
             new_server["rooms"] = []
             servers[ServerID] = new_server
+            database.servers.insert(new_server)
             self.response.write('OK')
         except Exception as e:
             if DEBUG:
@@ -187,6 +193,7 @@ class Servers(webapp2.RequestHandler):
     def delete(self, ServerID):
         try:
             servers.remove(ServerID)
+            database.servers.remove(ServerID)
             self.response.write('OK')
         except:
             self.response.write('FAIL')
@@ -219,6 +226,8 @@ class Rooms(webapp2.RequestHandler):
             first_user_name = first_user
             first_user = users[first_user]
             first_user["current_room"] = RoomID
+            database.rooms.insert(room)
+            database.users.update(first_user_name, first_user)
             self.response.write('OK')
         except Exception as e:
             if DEBUG:
@@ -229,14 +238,16 @@ class Rooms(webapp2.RequestHandler):
         try:
             data = json.loads(self.request.body)
             username = str(data["Username"])
-            user = users[username]
-            room = rooms[str(RoomID)]
+            user = database.users.get(username)
+            room = database.rooms.get(str(RoomID))
             command = str(data["command"])
             if command == "enter":
                 user["current_room"] = str(RoomID)
+                database.users.update(username, user)
                 self.response.write('OK')
             elif command == "exit":
                 user["current_room"] = None
+                database.users.update(username, user)
                 self.response.write('OK')
             else:
                 self.response.write('FAIL')
@@ -266,6 +277,7 @@ class Users(webapp2.RequestHandler):
             new_user["current_room"] = None
             new_user["status"] = "ON"
             users[username] = new_user
+            database.users.insert(new_user)
             self.response.write('OK')
         except:
             self.response.write('FAIL')
@@ -299,9 +311,8 @@ class Messages(webapp2.RequestHandler):
             InnerID = len(room_messages)
             OuterID = len(messages)
             data["InnerID"] = InnerID
-            #data["OuterID"] = OuterID
-            room_messages.append(data)
-            messages[OuterID] = data
+            data["OuterID"] = OuterID
+            database.messages.insert(message)
             self.response.write('OK')
         except Exception as e:
             if DEBUG:

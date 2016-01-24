@@ -5,7 +5,7 @@ import Pyro4
 from uuid import uuid4
 import requests, json
 
-DEBUG = False
+DEBUG = True
 
 def send_to_database(method, url, data = None):
     try:
@@ -63,14 +63,14 @@ def remove_server(url, serverID):
         return False
 
 def best_server(server_list):
+    #mudar
     best = -1
-    best_server = ""
     try:
-        for ServerID, server in server_list.iteritems():
+        for server in server_list:
             n_rooms = len(server["rooms"])
             if best == -1 or best > n_rooms:
                 best = n_rooms
-                best_server = ServerID
+                best_server = server
         return best_server
     except:
         return ""
@@ -118,6 +118,9 @@ class NameServerForClients(object):
                         print e
         return False
 
+    def report_crash(self, serverID, roomID):
+        pass
+
     def list_rooms(self):
         try:
       	     rooms = get_from_database(self.__db_url + "/rooms/")
@@ -144,11 +147,10 @@ class NameServerForClients(object):
                 try:
                     servers = get_from_database(self.__db_url + "/servers/")
                     if servers:
-                        ServerID = best_server(servers)
-                        server = servers[ServerID]
+                        server = best_server(servers)
                         new_room = {}
                         new_room["users"] = [username]
-                        new_room["server"] = ServerID
+                        new_room["server"] = server["ServerID"]
                         new_room["RoomID"] = str(RoomID)
                         if send_to_database("POST", self.__db_url + "/rooms/", new_room):
                             return server

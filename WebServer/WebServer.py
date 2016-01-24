@@ -4,10 +4,10 @@ import json
 import webapp2
 from webapp2_extras import routes
 from DataBase import DataBase
+
 users    = {}
 messages = {}
 rooms    = {}
-servers  = {}
 
 DEBUG = True
 
@@ -17,6 +17,7 @@ database = DataBase()
 
 class MainPage(webapp2.RequestHandler):
     def get(self):
+        
         s = ""
         s += '<p>'
         s += '<h4>Messages:  </h4>'
@@ -24,29 +25,39 @@ class MainPage(webapp2.RequestHandler):
         s += '<a href="html/messages">List of messages </a> &nbsp '
         s += '</p>'
 
-        if users:
-            s += '<h3>Users:</h3>'
-            for username in users.keys():
-                s += '<p>'
-                s += '<h4>User: ' + username + ' </h4>'
-                s += '<a href="html/users/' + username + '/messages/count">Number of messages of user: ' + username + ' </a> &nbsp '
-                s += '<a href="html/users/' + username +'/messages">List of messages of user: ' + username + ' </a> &nbsp '
-                s += '</p>'
-        else:
-            s += '<h3>No User Exist, Yet</h3>'
+        try:
+            users = database.users.get()
 
-        if rooms:
-            s += '<h3>Rooms:</h3>'
-            for RoomID in rooms.keys():
-                s += '<p>'
-                s += '<h4>Room: ' + RoomID + ' </h4>'
-                s += '<a href="html/' + RoomID + '/users/count">Number of users in room: ' + RoomID + ' </a> &nbsp '
-                s += '<a href="html/' + RoomID + '/users">List of users in room: ' + RoomID + ' </a> &nbsp '
-                s += '<a href="html/' + RoomID + '/messages/count">Number of messages in room: ' + RoomID + ' </a> &nbsp '
-                s += '<a href="html/' + RoomID + '/messages">List of messages in room: ' + RoomID + ' </a> &nbsp '
-                s += '</p>'
-        else:
-            s += '<h3>No Room Exist, Yet</h3>'
+            if users:
+                s += '<h3>Users:</h3>'
+                for user in users:
+                    s += '<p>'
+                    s += '<h4>User: ' + user["Username"] + ' </h4>'
+                    s += '<a href="html/users/' + user["Username"] + '/messages/count">Number of messages of user: ' + user["Username"] + ' </a> &nbsp '
+                    s += '<a href="html/users/' + user["Username"] +'/messages">List of messages of user: ' + user["Username"] + ' </a> &nbsp '
+                    s += '</p>'
+            else:
+                s += '<h3>No User Exist, Yet</h3>'
+        except:
+            pass
+
+        try:
+            rooms = database.rooms.get()
+            if rooms:
+                s += '<h3>Rooms:</h3>'
+                for room in rooms:
+                    s += '<p>'
+                    s += '<h4>Room: ' + room["RoomID"] + ' </h4>'
+                    s += '<a href="html/' + room["RoomID"] + '/users/count">Number of users in room: ' + room["RoomID"] + ' </a> &nbsp '
+                    s += '<a href="html/' + room["RoomID"] + '/users">List of users in room: ' + room["RoomID"] + ' </a> &nbsp '
+                    s += '<a href="html/' + room["RoomID"] + '/messages/count">Number of messages in room: ' + room["RoomID"] + ' </a> &nbsp '
+                    s += '<a href="html/' + room["RoomID"] + '/messages">List of messages in room: ' + room["RoomID"] + ' </a> &nbsp '
+                    s += '</p>'
+            else:
+                s += '<h3>No Room Exist, Yet</h3>'
+        except:
+            pass
+
         self.response.write(s)
 
 ###################### WebClient #####################
@@ -162,27 +173,20 @@ class MessagesList(webapp2.RequestHandler):
 
 class Servers(webapp2.RequestHandler):
     def get(self, ServerID = None):
-        if ServerID:
-            try:
-                self.response.write(json.dumps(servers[ServerID]))
-            except:
-                self.response.write(json.dumps({}))
-        else:
-            if servers:
-                self.response.write(json.dumps(servers))
-            else:
-                self.response.write(json.dumps({}))
+        try:
+            data = database.servers.get(ServerID)
+            self.response.write(json.dumps(data))
+        except:
+            self.response.write(json.dumps({}))
 
     def post(self, ServerID = None):
         try:
             data = json.loads(self.request.body)
-            ServerID = data["ServerID"]
             new_server = {}
+            new_server["ServerID"] = data["ServerID"]
             new_server["host"] = data["host"]
             new_server["pub_port"] = data["pub_port"]
             new_server["pull_port"] = data["pull_port"]
-            new_server["rooms"] = []
-            servers[ServerID] = new_server
             database.servers.insert(new_server)
             self.response.write('OK')
         except Exception as e:

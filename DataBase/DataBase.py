@@ -17,6 +17,7 @@ class Room(ndb.Model):
 class User(ndb.Model):
 	username = ndb.StringProperty()
 	current_room = ndb.StringProperty()
+	state = ndb.StringProperty()
 
 class Message(ndb.Model):
 	innerID = ndb.IntegerProperty()
@@ -40,6 +41,7 @@ def parser(type, item):
 		elif type == "user":
 			parsed_item["Username"] = item.username
 			parsed_item["Current_room"] = item.current_room
+			parsed_item["State"] = item.state
 		elif type == "message":
 			parsed_item["InnerID"] = item.innerID
 			parsed_item["OuterID"] = item.outerID
@@ -88,10 +90,10 @@ class Servers(webapp2.RequestHandler):
 					print e
 				self.response.write("FAIL")
 
-	def put(self, ServerID):
+	def put(self, ServerID = None):
 		if ServerID:
-			server = Server.query(Server.serverID == ServerID).get()
 			try:
+				server = Server.query(Server.serverID == ServerID).get()
 				data = json.loads(self.request.body)
 				if data.get("host"):
 					server.host = data.get("host")
@@ -139,7 +141,7 @@ class Rooms(webapp2.RequestHandler):
 	def post(self, RoomID = None):
 		try:
 			room = json.loads(self.request.body)
-			new_room = Room(roomID= room.get("RoomID"), server = server.get("ServerID"))
+			new_room = Room(roomID= room.get("RoomID"), server = room.get("ServerID"))
 			new_room.put()
 			self.response.write("OK")
 		except Exception as e:
@@ -148,15 +150,13 @@ class Rooms(webapp2.RequestHandler):
 			self.response.write("FAIL")
 
 
-	def put(self, RoomID):
+	def put(self, RoomID = None):
 		if RoomID:
 			room = Room.query(Room.roomID == RoomID).get()
 			try:
 				data = json.loads(self.request.body)
-				if data.get("roomID"):
-					room.roomID = data.get("roomID")
-				if data.get("serverID"):
-					room.server = data.get("serverID")
+				if data.get("ServerID"):
+					room.server = data.get("ServerID")
 				room.put()
 				self.response.write("OK")
 			except:
@@ -164,7 +164,7 @@ class Rooms(webapp2.RequestHandler):
 		else:
 			self.response.write("FAIL")
 
-	def delete(self, RoomID):
+	def delete(self, RoomID = None):
 		try:
 			if RoomID:
 				room = Room.query(Room.roomID == RoomID).get()
@@ -198,9 +198,7 @@ class Users(webapp2.RequestHandler):
 	def post(self, Username = None):
 		try:
 			user = json.loads(self.request.body)
-			print user
-			new_user = User(UserID = server.get("ServerID"), Current_room = user.get("Current_room"), Current_server = user.get("Current_server"))
-			print new_user
+			new_user = User(username = user.get("Username"), current_room = user.get("Current_room"), state = user.get("State"))
 			new_user.put()
 			self.response.write("OK")
 		except Exception as e:
@@ -208,31 +206,33 @@ class Users(webapp2.RequestHandler):
 				print e
 			self.response.write("FAIL")
 
-	def put(self, Username):
+	def put(self, Username = None):
 		if Username:
-			user = User.query(User.UserID == Username)
 			try:
+				user = User.query(User.username == Username).get()
 				data = json.loads(self.request.body)
-				if data.get("UserID"):
-					user.UserID = data.get("UserID")
 				if data.get("Current_room"):
-					user.Current_room = data.get("Current_room")
-				if data.get("Current_server"):
-					user.Current_server = data.get("Current_server")
+					user.current_room = data.get("Current_room")
+				if data.get("State"):
+					user.current_room = data.get("State")
 				user.put()
 				self.response.write("OK")
-			except:
+			except Exception as e:
+				if DEBUG:
+					print e
 				self.response.write("FAIL")
 		else:
 			self.response.write("FAIL")
 
-	def delete(self, Username):
+	def delete(self, Username = None):
 		try:
 			if Username:
-				user = User.query(User.UserID == Username)
-				user.delete()
+				user = User.query(User.UserID == Username).get()
+				user.key.delete()
 			else:
-				ndb.delete_multi(User.query().fetch())
+				users = User.query().fetch()
+				for user in users:
+					user.key.delete()
 			self.response.write("OK")
 		except Exception as e:
 			if DEBUG:
@@ -267,7 +267,9 @@ class Messages(webapp2.RequestHandler):
 					if message:
 						message_list.append(message)
 				self.response.write(message_list)
-		except:
+		except Exception as e:
+			if DEBUG:
+				print e
 			self.response.write({})
 
 	def post(self, RoomID = None, InnerID = None, OuterID = None):
@@ -312,7 +314,9 @@ class Messages(webapp2.RequestHandler):
 				self.response.write("OK")
 			else:
 				self.response.write("FAIL")
-		except:
+		except Exception as e:
+			if DEBUG:
+				print e
 			self.response.write("FAIL")
 
 

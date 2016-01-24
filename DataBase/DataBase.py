@@ -11,20 +11,47 @@ class Server(ndb.Model):
 	pull_port = ndb.IntegerProperty()
 
 class Room(ndb.Model):
-	roomId = ndb.StringProperty()
-	serverID = ndb.StringProperty()
+	roomID = ndb.StringProperty()
+	server = ndb.StringProperty()
 
 class User(ndb.Model):
-	UserID = ndb.IntegerProperty()
-	Current_room=ndb.IntegerProperty()
-	Current_server=ndb.IntegerProperty()
+	username = ndb.StringProperty()
+	current_room = ndb.StringProperty()
 
 class Message(ndb.Model):
 	innerID = ndb.IntegerProperty()
 	outerID = ndb.IntegerProperty()
 	text = ndb.StringProperty()
-	roomID = ndb.StringProperty()
+	room = ndb.StringProperty()
 	from_user = ndb.StringProperty()
+
+def parser(type, item):
+	parsed_item = {}
+	try:
+		if type == "server":
+			print item
+			parsed_item["ServerID"] = item.serverID
+			parsed_item["host"] = item.host
+			parsed_item["pub_port"] = item.pub_port
+			parsed_item["pull_port"] = item.pull_port
+		elif type == "room":
+			parsed_item["RoomID"] = item.roomID
+			parsed_item["current_server"] = item.server
+		elif type == "user":
+			parsed_item["Username"] = item.username
+			parsed_item["Current_room"] = item.current_room
+		elif type == "message":
+			parsed_item["InnerID"] = item.innerID
+			parsed_item["OuterID"] = item.outerID
+			parsed_item["Message"] = item.text
+			parsed_item["RoomID"] =	item.room
+			parsed_item["From"] = item.from_user
+		else:
+			return {}
+	except Exception as e:
+		print e
+		return {}
+	return parsed_item
 
 #Servidor REST
 
@@ -32,31 +59,38 @@ class Servers(webapp2.RequestHandler):
 	def get(self, ServerID = None):
 		try:
 			if ServerID:
-				server = Server.query(Server.serverID == ServerID)
-				self.response.write(server.content)
+				server = Server.query(Server.serverID == ServerID).get()
+				server = parser("server", server)
+				self.response.write(server)
 			else:
-				servers = Server.query()
+				servers = Server.query().fetch()
+				server_list = []
 				for server in servers:
-					print server
-				self.response.write(servers.content)
-		except:
-			self.response.write({})
-	def post(self):
-		try:
-			server = json.loads(self.request.body)
-			print server
-			new_server = Server(serverID = server.get("ServerID"), host = server.get("host"), pub_port = server.get("pub_port"), pull_port = server.get("pull_port"))
-			print new_server
-			new_server.put()
-			self.response.write("OK")
+					server = parser("server", server)
+					if server:
+						server_list.append(server)
+				self.response.write(server_list)
 		except Exception as e:
-			if DEBUG:
-				print e
+			print e
+			self.response.write({})
+
+	def post(self, ServerID = None):
+		if ServerID:
 			self.response.write("FAIL")
+		else:
+			try:
+				server = json.loads(self.request.body)
+				new_server = Server(serverID = server.get("ServerID"), host = server.get("host"), pub_port = server.get("pub_port"), pull_port = server.get("pull_port"))
+				new_server.put()
+				self.response.write("OK")
+			except Exception as e:
+				if DEBUG:
+					print e
+				self.response.write("FAIL")
 
 	def put(self, ServerID):
 		if ServerID:
-			server = Server.query(Server.serverID == ServerID)
+			server = Server.query(Server.serverID == ServerID).get()
 			try:
 				data = json.loads(self.request.body)
 				if data.get("host"):
@@ -75,13 +109,12 @@ class Servers(webapp2.RequestHandler):
 	def delete(self, ServerID = None):
 		try:
 			if ServerID:
-				server = Server.query(Server.serverID == ServerID)
-				print server
-				print server.fetch
+				server = Server.query(Server.serverID == ServerID).get()
+				server.key.delete()
 			else:
-				ndb.delete_multi(
-				    Server.query().fetch()
-				)
+				servers = Server.query().fetch()
+				for server in servers:
+					print server.key.delete()
 			self.response.write("OK")
 		except Exception as e:
 			if DEBUG:
@@ -91,107 +124,235 @@ class Servers(webapp2.RequestHandler):
 class Rooms(webapp2.RequestHandler):
 	def get(self, RoomID = None):
 		if RoomID:
-			pass
+			room = Room.query(Room.roomID == RoomID).get()
+			room = parser("room", room)
+			self.response.write(room)
 		else:
-			pass
+			rooms = Room.query().fetch()
+			room_list = []
+			for room in rooms:
+				room = parser("room", room)
+				if room:
+					room_list.append(room)
+			self.response.write(room_list)
 
 	def post(self, RoomID = None):
-		if RoomID:
-			pass
-		else:
-			try:
-				room = json.loads(self.request.body)
-			except:
-				pass
+		try:
+			room = json.loads(self.request.body)
+			new_room = Room(roomID= room.get("RoomID"), server = server.get("ServerID"))
+			new_room.put()
+			self.response.write("OK")
+		except Exception as e:
+			if DEBUG:
+				print e
+			self.response.write("FAIL")
+
 
 	def put(self, RoomID):
 		if RoomID:
+			room = Room.query(Room.roomID == RoomID).get()
 			try:
 				data = json.loads(self.request.body)
+				if data.get("roomID"):
+					room.roomID = data.get("roomID")
+				if data.get("serverID"):
+					room.server = data.get("serverID")
+				room.put()
+				self.response.write("OK")
 			except:
-				pass
+				self.response.write("FAIL")
 		else:
-			pass
+			self.response.write("FAIL")
 
 	def delete(self, RoomID):
-		if RoomID:
-			pass
-		else:
-			pass
+		try:
+			if RoomID:
+				room = Room.query(Room.roomID == RoomID).get()
+				room.key.delete()
+			else:
+				rooms = Room.query().fetch()
+				for room in rooms:
+					room.key.delete()
+			self.response.write("OK")
+		except Exception as e:
+			if DEBUG:
+				print e
+			self.response.write("FAIL")
 
 
 class Users(webapp2.RequestHandler):
 	def get(self, Username = None):
 		if Username:
-			pass
+			user = User.query(User.username == Username).get()
+			user = parser("user", user)
+			self.response.write(user)
 		else:
-			pass
+			user_list = []
+			users = User.query().fetch()
+			for user in users:
+				user = parser("user", user)
+				if user:
+					user_list.append(user)
+			self.response.write(user_list)
 
 	def post(self, Username = None):
-		if Username:
-			pass
-		else:
-			try:
-				user = json.loads(self.request.body)
-			except:
-				pass
+		try:
+			user = json.loads(self.request.body)
+			print user
+			new_user = User(UserID = server.get("ServerID"), Current_room = user.get("Current_room"), Current_server = user.get("Current_server"))
+			print new_user
+			new_user.put()
+			self.response.write("OK")
+		except Exception as e:
+			if DEBUG:
+				print e
+			self.response.write("FAIL")
 
 	def put(self, Username):
 		if Username:
+			user = User.query(User.UserID == Username)
 			try:
 				data = json.loads(self.request.body)
+				if data.get("UserID"):
+					user.UserID = data.get("UserID")
+				if data.get("Current_room"):
+					user.Current_room = data.get("Current_room")
+				if data.get("Current_server"):
+					user.Current_server = data.get("Current_server")
+				user.put()
+				self.response.write("OK")
 			except:
-				pass
+				self.response.write("FAIL")
 		else:
-			pass
+			self.response.write("FAIL")
 
 	def delete(self, Username):
-		if Username:
-			pass
-		else:
-			pass
+		try:
+			if Username:
+				user = User.query(User.UserID == Username)
+				user.delete()
+			else:
+				ndb.delete_multi(User.query().fetch())
+			self.response.write("OK")
+		except Exception as e:
+			if DEBUG:
+				print e
+			self.response.write("FAIL")
 
 class Messages(webapp2.RequestHandler):
 	def get(self, RoomID = None, InnerID = None, OuterID = None):
-		if RoomID:
-			if InnerID:
-				pass
-		elif OuterID:
-			pass
-		else:
-			pass
+		try:
+			if RoomID:
+				if InnerID:
+					message = Message.query(ndb.AND(Message.room == RoomID, Message.innerID == InnerID)).get()
+					message = parser("message", message)
+					self.response.write(message)
+				else:
+					messages = Message.query(Message.room == RoomID).fetch()
+					message_list = []
+					for message in messages:
+						message = parser("message", message)
+						if message:
+							message_list.append(message)
+					self.response.write(message_list)
+			elif OuterID:
+				message = Message.query(Message.outerID == OuterID).get()
+				message = parser("message", message)
+				self.response.write(message)
+			else:
+				Message = Message.query().fetch()
+				message_list = []
+				for message in messages:
+					message = parser("message", message)
+					if message:
+						message_list.append(message)
+				self.response.write(message_list)
+		except:
+			self.response.write({})
 
 	def post(self, RoomID = None, InnerID = None, OuterID = None):
 		try:
 			message = json.loads(self.request.body)
-		except:
-			pass
+			new_message = Message(innerID = message.get("InnerID"), outerID = message.get("OuterID"), roomID = message.get("RoomID"), from_user= message.get("From"), text=message.get("Text"))
+			new_message.put()
+			self.response.write("OK")
+		except Exception as e:
+			if DEBUG:
+				print e
+			self.response.write("FAIL")
 
 	def put(self, RoomID = None, InnerID = None, OuterID = None):
-		if RoomID:
-			if InnerID:
+		try:
+			if RoomID:
+				if InnerID:
+					message = Message.query(ndb.AND(Message.room == RoomID, Message.innerID == InnerID)).get()
+					data = json.loads(self.request.body)
+					if data.get("innerID"):
+						message.innerId = data.get("innerID")
+					if data.get("roomID"):
+						message.roomID = data.get("roomID")
+					if data.get("text"):
+						message.text = data.get("text")
+					if data.get("from_user"):
+						message.from_user = data.get("from_user")
+					self.response.write("OK")
+				else:
+					self.response.write("FAIL")
+			elif OuterID:
+				message = Message.query(Message.outerID == OuterID).get()
 				data = json.loads(self.request.body)
-		elif OuterID:
-			data = json.loads(self.request.body)
-		else:
-			pass
+				if data.get("innerID"):
+					message.innerId = data.get("innerID")
+				if data.get("roomID"):
+					message.roomID = data.get("roomID")
+				if data.get("text"):
+					message.text = data.get("text")
+				if data.get("from_user"):
+					message.from_user = data.get("from_user")
+				self.response.write("OK")
+			else:
+				self.response.write("FAIL")
+		except:
+			self.response.write("FAIL")
+
 
 	def delete(self, RoomID  = None, InnerID = None, OuterID = None):
-		if RoomID:
-			if InnerID:
-				pass
-		elif OuterID:
-			pass
-		else:
-			pass
+		try:
+			if RoomID:
+				if InnerID:
+					message = Message.query(ndb.AND(Message.room == RoomID, Message.innerID == InnerID)).get()
+					message.key.delete()
+				else:
+					messages = Message.query(Message.room == RoomID).fetch()
+					for message in messages:
+						message.key.delete()
+			elif OuterID:
+				message = Message.query(Message.room == RoomID, Message.outerID == OuterID).get()
+				message.key.delete()
+			else:
+				messages = Message.query().fetch()
+				for message in messages:
+					message.key.delete()
+			self.response.write("OK")
+		except Exception as e:
+			if DEBUG:
+				print e
+			self.response.write("FAIL")
 
 app = webapp2.WSGIApplication([
-				(r'/servers', Servers),
-				(r'/servers/<ServerID:[\w-]*>', Servers),
-				(r'/rooms/<RoomID:\w*>', Rooms),
-				(r'/users/<ServerID:\w*>', Users),
-				(r'/messages/<OuterID:\w*>', Messages),
-				(r'/messages/<RoomID:\w+>/<InnerID:\w*>', Messages),
+				webapp2.Route(r'/servers/<ServerID>', Servers),
+				webapp2.Route(r'/servers', Servers),
+
+				webapp2.Route(r'/rooms/<RoomID:\w+>', Rooms),
+				webapp2.Route(r'/rooms', Rooms),
+
+				webapp2.Route(r'/users/<Username:\w+>', Users),
+				webapp2.Route(r'/users', Users),
+
+				webapp2.Route(r'/messages/<RoomID:\w+>/<InnerID:\w+>', Messages),
+				webapp2.Route(r'/messages/<RoomID:\w+>', Messages),
+				webapp2.Route(r'/messages/<OuterID:\w+>', Messages),
+				webapp2.Route(r'/messages', Messages),
             ], debug = True)
 
 def main():

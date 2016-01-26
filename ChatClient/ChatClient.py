@@ -6,7 +6,7 @@ import sys
 import threading
 import zmq
 
-DEBUG = False
+DEBUG = True
 
 def tprint(msg):
     sys.stdout.write(msg + '\n> ')
@@ -28,10 +28,11 @@ def def_username():
             return username
 
 class Backend(threading.Thread):
-    def __init__(self, username, ctx, output = None):
+    def __init__(self, username, ctx, error_handler = None, output = None):
         super(Backend, self).__init__ ()
         self.__username = username
-        self.__ctx     = ctx
+        self.__error_handler = error_handler
+        self.__ctx = ctx
         self.__running = False
         self.__boot(output)
 
@@ -50,14 +51,19 @@ class Backend(threading.Thread):
             url = "tcp://" + host + ":" + str(port)
             self.__socket.connect(url)
             self.__socket.setsockopt(zmq.SUBSCRIBE, "__")
-        except:
-            print "failed to connect backend to " + url
+        except Exception as e:
+            print "MERDA"
+            if DEBUG:
+                print e
+                print "failed to connect backend to " + url
+            if self.__error_handler:
+                self.__error_handler()
 
     def subscribe(self, RoomID):
         self.__socket.setsockopt(zmq.SUBSCRIBE, RoomID)
 
     def unsubscribe(self, RoomID):
-        self.__socket.setsockopt(zmq.SUBSCRIBE, RoomID)
+        self.__socket.setsockopt(zmq.UNSUBSCRIBE , RoomID)
 
     def __is_running(self):
         return self.__running
@@ -69,6 +75,7 @@ class Backend(threading.Thread):
         try:
             json0 = message.find('{')
             message = json.loads(message[json0:])
+            print message
             if message["from"] != self.__username:
                 text = message["message"]
                 text = message["from"] + ": " + text
@@ -83,13 +90,19 @@ class Backend(threading.Thread):
     def run(self):
         self.__running = True
         while True:
-            message = self.__socket.recv()
+            try:
+                message = self.__socket.recv()
+            except zmq.ZMQError as e:
+                print e
+                if e.errno == zmq.ETERM:
+                    print "PASCOA"
             self.process_message(message)
 
 class Frontend(threading.Thread):
-    def __init__(self, ctx):
+    def __init__(self, ctx, error_handler = None):
         super(Frontend, self).__init__ ()
         self.__ctx = ctx
+        self.__error_handler = error_handler
         self.__boot()
 
     def __boot(self):
@@ -101,11 +114,26 @@ class Frontend(threading.Thread):
         try:
             url = "tcp://" + host + ":" + str(port)
             self.__socket.connect(url)
-        except:
-            print "failed to connect frontend to " + url
+        except Exception as e:
+            print "MERDA"
+            if DEBUG:
+                print e
+                print "failed to connect frontend to " + url
+            if self.__error_handler:
+                self.__error_handler()
 
     def send(self, message):
-        self.__socket.send(message)
+        try:
+            self.__socket.send(message)
+        except zmq.ZMQError as e:
+            print e
+            if e.errno == zmq.ETERM:
+                print "PASCOA"
+        # except Exception as e:
+        #     if self.__error_handler:
+        #         self.__error_handler()
+        #     if DEBUG:
+        #         print e
 
     def stop(self):
         self.__socket.close()
@@ -114,6 +142,7 @@ class ChatClient():
     def __init__(self, output = None):
         self.__registered = False
         self.__connected = False
+        self.__server = None
         self.__output = output
         self.__username = ""
         self.__current_room = None
@@ -134,7 +163,8 @@ class ChatClient():
                 if DEBUG:
                     print "Unable to connect to nameserver"
                 return False
-        except:
+        except Exception as e:
+            print e
             if DEBUG:
                 print "Unable to connect to nameserver"
             return False
@@ -144,23 +174,30 @@ class ChatClient():
             if self.__ns.unregister(self.__username):
                 return True
             else:
-                print "Unable to logout"
+                if DEBUG:
+                    print "Unable to logout"
         else:
-            print "You are not logged, yet"
+            if DEBUG:
+                print "You are not logged, yet"
+
+    def __error_handler(self):
+        self.__ns.report_crash(self.__server["serverID"])
 
     def is_registered(self):
         return self.__registered
 
     def connect(self, host, frontend_port, backend_port):
         try:
-            self.__frontend = Frontend(self.__ctx)
+            self.__frontend = Frontend(self.__ctx, error_handler = self.__error_handler)
             self.__frontend.connect(host, frontend_port)
-            self.__backend = Backend(self.__username, self.__ctx, self.__output)
+            self.__backend = Backend(self.__username, self.__ctx, error_handler = self.__error_handler, output = self.__output)
             self.__backend.connect(host, backend_port)
             self.__backend.start()
             self.__connected = True
             return True
-        except:
+        except Exception as e:
+            if DEBUG:
+                print e
             return False
 
     def disconnect(self):
@@ -169,7 +206,9 @@ class ChatClient():
             self.__backend.stop()
             self.__connected = False
             return True
-        except:
+        except Exception as e:
+            if DEBUG:
+                print e
             return False
 
     def is_connected(self):
@@ -180,23 +219,30 @@ class ChatClient():
         print_rooms(room_list)
 
     def enter_room(self, RoomID):
-        server = self.__ns.enter_room(RoomID, self.__username)
-        try:
-            if self.connect(server["host"], server["pull_port"], server["pub_port"]):
-                self.__current_room = RoomID
-                self.__backend.subscribe(RoomID)
-                return True
-            else:
-                if DEBUG:
-                    print "Failed to enter room: " + RoomID
-                return False
-        except:
-            print "failed to connect to server"
-            return False
+        if RoomID:
+            server = self.__ns.get_room_server(RoomID, self.__username)
+            if server:
+                try:
+                    self.__server = server
+                    if self.connect(server["host"], server["pull_port"], server["pub_port"]):
+                        self.__ns.enter_room(RoomID, self.__username)
+                        self.__current_room = RoomID
+                        self.__backend.subscribe(RoomID)
+                        return True
+                    else:
+                        if DEBUG:
+                            print "Failed to enter room: " + RoomID
+
+                except Exception as e:
+                    if DEBUG:
+                        print e
+                        print "failed to connect to server"
+        return False
 
     def leave_room(self):
         try:
             self.disconnect()
+            self.__server = None
             self.__ns.leave_room(self.__username)
             self.__current_room = None
             self.__backend.unsubscribe(RoomID)
@@ -215,7 +261,9 @@ class ChatClient():
             }
             self.__frontend.send(json.dumps(message))
             return True
-        except:
+        except Exception as e:
+            if DEBUG:
+                print e
             return False
 
     def room(self):
@@ -227,7 +275,6 @@ class ChatClient():
                 self.leave_room()
                 os.system('clear')
             elif cmd != "":
-
                 if not self.send_message(cmd):
                     tprint("Unable to send message!")
 
@@ -255,7 +302,7 @@ class ChatClient():
                 if self.__registered:
                     if roomID != "":
                         if self.enter_room(roomID):
-                            os.system('clear')
+                            #os.system('clear')
                             print "Room " + roomID
                             self.room()
                     else:

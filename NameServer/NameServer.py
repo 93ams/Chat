@@ -3,9 +3,9 @@
 
 import Pyro4
 from uuid import uuid4
-import requests, json
+import requests, json, time
 
-DEBUG = True
+DEBUG = False
 
 def send_to_database(method, url, data = None):
     try:
@@ -108,15 +108,15 @@ class NameServerForClients(object):
                 if user:
                     data = {}
                     data["command"] = "logout"
-                    if send_to_database("PUT", self.__db_url + "/users/" + username, data):
+                    if send_to_database("PUT", self.__db_url + "/users/" + str(username), data):
                         return True
             except Exception as e:
                 if DEBUG:
                     print e
         return False
 
-    def report_crash(self, serverID, roomID):
-        pass
+    def report_crash(self, serverID):
+        print "Error @ " + serverID
 
     def list_rooms(self):
         try:
@@ -130,48 +130,49 @@ class NameServerForClients(object):
                 print e
             return []
 
-    def enter_room(self, RoomID, username):
-        if RoomID:
-            try:
-                data = {}
-                room = get_from_database(self.__db_url + "/rooms/" + str(RoomID))
+    def get_room_server(self, RoomID, username):
+        try:
+            room = get_from_database(self.__db_url + "/rooms/" + str(RoomID))
+            if room:
                 ServerID = room["server"]
                 server = get_from_database(self.__db_url + "/servers/" + ServerID)
-                if not server:
-                    return None
-                data["command"] = "enter"
-                data["RoomID"] = RoomID
-                if send_to_database("PUT", self.__db_url + "/users/" + str(username), data):
+                if server:
                     return server
-            except Exception as e:
-                if DEBUG:
-                    print e
-                try:
-                    server = get_from_database(self.__db_url + "/bestserver")
+            else:
+                server = get_from_database(self.__db_url + "/bestserver")
+                if server:
                     new_room = {}
                     new_room["first_user"] = username
                     new_room["server"] = server["ServerID"]
                     new_room["RoomID"] = str(RoomID)
                     if send_to_database("POST", self.__db_url + "/rooms/", new_room):
                         return server
-                except Exception as e:
-                    if DEBUG:
-                        print e
+        except Exception as e:
+            if DEBUG:
+                print e
         return None
+
+    def enter_room(self, RoomID, username):
+        if RoomID:
+            try:
+                data = {}
+                data["command"] = "enter"
+                data["RoomID"] = RoomID
+                if send_to_database("PUT", self.__db_url + "/users/" + str(username), data):
+                    return True
+            except Exception as e:
+                if DEBUG:
+                    print e
+        return False
 
     def leave_room(self, username):
         if username:
             try:
                 data = {}
-                user = get_from_database(self.__db_url + "/users/" + str(username))
-                print "User: "
-                print user
-                RoomID = user["current_room"]
-                if RoomID:
-                    data["Username"] = username
-                    data["command"] = "exit"
-                    if send_to_database("PUT", self.__db_url + "/rooms/" + str(RoomID) , data):
-        	           return True
+                data["Username"] = username
+                data["command"] = "exit"
+                if send_to_database("PUT", self.__db_url + "/users/" + str(username) , data):
+                    return True
             except Exception as e:
                 if DEBUG:
                     print e
@@ -180,6 +181,13 @@ class NameServerForClients(object):
 class NameServerForServers(object):
     def __init__(self):
         self.__db_url = "http://localhost:7000/nameserver"
+        self.__heartbeat_rate = 0.2
+
+    def get_heartbeat_rate(self):
+        return self.__heartbeat_rate
+
+    def heartbeat(self, data):
+        print data
 
     def register(self, host, pull_port, pub_port):
         #rebalancear as salas

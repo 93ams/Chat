@@ -4,6 +4,7 @@ import os
 import Pyro4
 import requests
 import sys
+import time
 import threading
 import zmq
 
@@ -41,6 +42,28 @@ def find_a_port(socket, starting_port):
             port += 1
     return port
 
+class Heart(threading.Thread):
+    def __init__(self, heartbeat_handler, heartbeat_rate, id):
+        super(Heart, self).__init__ ()
+        self.__heartbeat_handler = heartbeat_handler
+        self.__heartbeat_rate = heartbeat_rate
+        self.__id = id
+
+    def stop(self):
+        self._Thread__stop()
+
+    def run(self):
+        data = {"id": self.__id}
+        while True:
+            data["timedate"] = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+            try:
+                self.__heartbeat_handler(data)
+            except Exception as e:
+                if DEBUG:
+                    print e
+                self.stop()
+            time.sleep(1/float(self.__heartbeat_rate))
+            
 class Worker(threading.Thread):
     def __init__(self, pull_socket, push_socket, publish_socket):
         super(Worker, self).__init__ ()
@@ -69,7 +92,7 @@ class Worker(threading.Thread):
             if DEBUG:
                 print e
             return False
-            
+
     def recv_message(self):
         msg = self.__pull.recv()
         try:
@@ -110,6 +133,7 @@ class ChatServer():
 
     def unregister(self):
         try:
+            self.__heart.stop()
             self.__ns.unregister(self.__id)
             self.__registered = False
             return True
@@ -119,12 +143,16 @@ class ChatServer():
     def register(self, ns_host, ns_port):
         try:
             self.__ns = Pyro4.Proxy("PYRONAME:nameserver.servers")
+            hb_rate = self.__ns.get_heartbeat_rate()
             self.__id = self.__ns.register(self.__host, self.__pull_port, self.__pub_port)
             if self.__id:
+                self.__heart = Heart(self.__ns.heartbeat, hb_rate, self.__id)
+                self.__heart.start()
                 self.__registered = True
                 return True
-        except:
-            pass
+        except Exception as e:
+            if DEBUG:
+                print e
         return False
 
     def start(self):

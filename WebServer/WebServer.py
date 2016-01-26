@@ -328,27 +328,35 @@ class Users(webapp2.RequestHandler):
 
     def put(self, UserName):
         try:
+            print "PASCOA"
             data = json.loads(self.request.body)
             command = data["command"]
+            print command
             if command == "login":
                 data = {"status": "ON"}
-                database.users.update(UserName, data)
-                self.response.write('OK')
+                if database.users.update(UserName, data):
+                    self.response.write('OK')
+                else:
+                    self.response.write('FAIL')
             elif command == "logout":
                 data = {"status": "OFF"}
-                database.users.update(UserName, data)
-                self.response.write('OK')
+                if database.users.update(UserName, data):
+                    self.response.write('OK')
+                else:
+                    self.response.write('FAIL')
             elif command == "enter":
                 RoomID = data["RoomID"]
                 data = {"current_room": RoomID}
-                database.users.update(UserName, data)
-                self.response.write('OK')
+                if database.users.update(UserName, data):
+                    self.response.write('OK')
+                else:
+                    self.response.write('FAIL')
             elif command == "exit":
                 data = {"current_room": None}
-                database.users.update(UserName, data)
-                self.response.write('OK')
-            else:
-                self.response.write('FAIL')
+                if database.users.update(UserName, data):
+                    self.response.write('OK')
+                else:
+                    self.response.write('FAIL')
         except Exception as e:
             if DEBUG:
                 print "PUT Users"
@@ -364,6 +372,7 @@ class Messages(webapp2.RequestHandler):
             self.response.write(messages)
         except Exception as e:
             if DEBUG:
+                print "GET Message"
                 print e
             self.response.write([])
 

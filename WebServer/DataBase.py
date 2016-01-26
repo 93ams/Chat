@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from google.appengine.ext import ndb
 
-DEBUG = True
+DEBUG = False
 REMOTE = False
 
 if REMOTE:
@@ -102,11 +102,11 @@ class Servers():
 	def update(self, ServerID, data):
 		try:
 			server = Server.query(Server.serverID == ServerID).get()
-			if data.get("host"):
+			if "host" in data:
 			    server.host = data.get("host")
-			if data.get("pub_port"):
+			if "pub_port" in data:
 			    server.pub_port = data.get("pub_port")
-			if data.get("pull_port"):
+			if "pull_port" in data:
 			    server.pull_port = data.get("pull_port")
 			server.put()
 			return True
@@ -186,7 +186,7 @@ class Rooms():
 		if RoomID:
 			try:
 				room = Room(Room.roomID == RoomID).get()
-				if data.get("server"):
+				if "server" in data:
 				    room.server = data.get("server")
 			except Exception as e:
 				if DEBUG:
@@ -264,9 +264,11 @@ class Users():
 		if Username:
 			try:
 				user = User.query(User.username == Username).get()
-				if data.get("current_room"):
+				print "User: "
+				print user
+				if "current_room" in data:
 				    user.current_room = data.get("current_room")
-				if data.get("status"):
+				if "status" in data:
 				    user.status = data.get("status")
 				user.put()
 				return True
@@ -328,7 +330,6 @@ class Messages():
 				return message
 			else:
 				messages = Message.query().order(Message.outerID).fetch()
-				print messages
 				message_list = []
 				for message in messages:
 					message = parser("message", message)
@@ -337,7 +338,6 @@ class Messages():
 				return message_list
 		except Exception as e:
 			if DEBUG:
-				print "MERDA"
 				print e
 			return {}
 
@@ -359,7 +359,6 @@ class Messages():
 		try:
 			new_message = Message(outerID = message.get("OuterID"), innerID = message.get("InnerID"), text = message.get("message"), from_user = message.get("from"), room = message.get("RoomID"))
 			new_message.put()
-			print "should be chill"
 			return True
 		except Exception as e:
 			if DEBUG:
@@ -371,16 +370,16 @@ class Messages():
 			if RoomID:
 				if InnerID:
 					message = Message.query(ndb.AND(Message.room == RoomID, Message.innerID == InnerID)).get()
-					if data.get("from"):
+					if "from" in data:
 						message.from_user = data.get("from")
-					if data.get("message"):
+					if "message" in data:
 						message.from_user = data.get("text")
 					return True
 			elif OuterID:
 				message = Message.query(Message.outerID == OuterID).get()
-				if data.get("from"):
+				if "from" in data:
 					message.from_user = data.get("from")
-				if data.get("message"):
+				if "message" in data:
 					message.from_user = data.get("message")
 				return True
 			else:

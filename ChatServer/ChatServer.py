@@ -56,7 +56,6 @@ class Heart(threading.Thread):
     def run(self):
         data = {"id": self.__id}
         while True:
-            data["timedate"] = datetime.datetime.now()
             try:
                 self.__heartbeat_handler(data)
             except Exception as e:

@@ -3,7 +3,7 @@
 
 import Pyro4
 from uuid import uuid4
-import requests, json, time
+import requests, json, time, datetime
 
 DEBUG = False
 
@@ -28,13 +28,10 @@ def send_to_database(method, url, data = None):
     return False
 
 def add_beat(list, beat):
-    if len(list) < 10:
-        list.append(beat)
-    else:
-        list.rotate(-1)
-        list[9] = beat
-    print list
-    
+    if len(list) == 5:
+        list.pop(0)
+    list.append(beat)
+
 def get_from_database(url):
     try:
         r = requests.get(url)
@@ -85,8 +82,9 @@ def best_server(server_list):
         return ""
 
 class NameServerForClients(object):
-    def __init__(self):
-        self.__db_url = "http://localhost:7000/nameserver"
+    def __init__(self, db_url, heartbeat_rate):
+        self.__db_url = db_url
+        self.__heartbeat_rate = heartbeat_rate
 
     def register(self, username):
         if username:
@@ -124,6 +122,17 @@ class NameServerForClients(object):
                 if DEBUG:
                     print e
         return False
+
+    def check_server(self, serverID):
+        server = server_list[serverID]
+        beat_list = server["last_beats"]
+        last_beat = beat_list[len(beat_list) - 1]
+        now = datetime.datetime.now()
+        if now - last_beat < datetime.timedelta(seconds = 5 * self.__heartbeat_rate):
+            return True
+        else:
+            #resolver
+            return False
 
     def report_crash(self, serverID):
         print "Error @ " + serverID
@@ -189,9 +198,9 @@ class NameServerForClients(object):
         return False
 
 class NameServerForServers(object):
-    def __init__(self):
-        self.__db_url = "http://localhost:7000/nameserver"
-        self.__heartbeat_rate = 0.2
+    def __init__(self, db_url, heartbeat_rate):
+        self.__db_url = db_url
+        self.__heartbeat_rate = heartbeat_rate
 
     def get_heartbeat_rate(self):
         return self.__heartbeat_rate
@@ -199,7 +208,7 @@ class NameServerForServers(object):
     def heartbeat(self, data):
         try:
             server = server_list[data["id"]]
-            add_beat(server["last_beats"], data["timedate"])
+            add_beat(server["last_beats"],  datetime.datetime.now())
         except Exception as e:
             print e
 
@@ -228,8 +237,11 @@ class NameServerForServers(object):
             return False
 
 def main():
-    Server_NS = NameServerForServers()
-    Client_NS = NameServerForClients()
+    db_url = "http://localhost:7000/nameserver"
+    heartbeat_rate = 1
+
+    Server_NS = NameServerForServers(db_url, heartbeat_rate)
+    Client_NS = NameServerForClients(db_url, heartbeat_rate)
 
     daemon = Pyro4.Daemon()
 

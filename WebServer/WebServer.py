@@ -18,8 +18,8 @@ class MainPage(webapp2.RequestHandler):
     def get(self):
 
         s = ""
-        s += '<p>'
         s += '<h4>Messages:  </h4>'
+        s += '<p>'
         s += '<a href="html/messages/count">Number of messages </a> &nbsp '
         s += '<a href="html/messages">List of messages </a> &nbsp '
         s += '</p>'

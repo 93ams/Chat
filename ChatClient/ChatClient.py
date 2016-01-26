@@ -28,10 +28,9 @@ def def_username():
             return username
 
 class Backend(threading.Thread):
-    def __init__(self, username, ctx, error_handler = None, output = None):
+    def __init__(self, username, ctx, output = None):
         super(Backend, self).__init__ ()
         self.__username = username
-        self.__error_handler = error_handler
         self.__ctx = ctx
         self.__running = False
         self.__boot(output)
@@ -56,8 +55,6 @@ class Backend(threading.Thread):
             if DEBUG:
                 print e
                 print "failed to connect backend to " + url
-            if self.__error_handler:
-                self.__error_handler()
 
     def subscribe(self, RoomID):
         self.__socket.setsockopt(zmq.SUBSCRIBE, RoomID)
@@ -75,7 +72,6 @@ class Backend(threading.Thread):
         try:
             json0 = message.find('{')
             message = json.loads(message[json0:])
-            print message
             if message["from"] != self.__username:
                 text = message["message"]
                 text = message["from"] + ": " + text
@@ -99,10 +95,11 @@ class Backend(threading.Thread):
             self.process_message(message)
 
 class Frontend(threading.Thread):
-    def __init__(self, ctx, error_handler = None):
+    def __init__(self, ctx, serverID = None, failure_handler = None):
         super(Frontend, self).__init__ ()
         self.__ctx = ctx
-        self.__error_handler = error_handler
+        self.__failure_handler = failure_handler
+        self.__serverID = serverID
         self.__boot()
 
     def __boot(self):
@@ -115,25 +112,23 @@ class Frontend(threading.Thread):
             url = "tcp://" + host + ":" + str(port)
             self.__socket.connect(url)
         except Exception as e:
-            print "MERDA"
             if DEBUG:
                 print e
                 print "failed to connect frontend to " + url
-            if self.__error_handler:
-                self.__error_handler()
 
     def send(self, message):
         try:
-            self.__socket.send(message)
-        except zmq.ZMQError as e:
-            print e
-            if e.errno == zmq.ETERM:
-                print "PASCOA"
-        # except Exception as e:
-        #     if self.__error_handler:
-        #         self.__error_handler()
-        #     if DEBUG:
-        #         print e
+            if self.__failure_handler:
+                if self.__failure_handler(self.__serverID):
+                    self.__socket.send(message)
+                else:
+                    if DEBUG:
+                        print "fail"
+            else:
+                self.__socket.send(message)
+        except Exception as e:
+            if DEBUG:
+                print e
 
     def stop(self):
         self.__socket.close()
@@ -180,21 +175,21 @@ class ChatClient():
             if DEBUG:
                 print "You are not logged, yet"
 
-    def __error_handler(self):
-        self.__ns.report_crash(self.__server["serverID"])
-
     def is_registered(self):
         return self.__registered
 
     def connect(self, host, frontend_port, backend_port):
         try:
-            self.__frontend = Frontend(self.__ctx, error_handler = self.__error_handler)
-            self.__frontend.connect(host, frontend_port)
-            self.__backend = Backend(self.__username, self.__ctx, error_handler = self.__error_handler, output = self.__output)
-            self.__backend.connect(host, backend_port)
-            self.__backend.start()
-            self.__connected = True
-            return True
+            if self.__ns.check_server(self.__server["ServerID"]):
+                self.__frontend = Frontend(self.__ctx, serverID = self.__server["ServerID"], failure_handler = self.__ns.check_server)
+                self.__frontend.connect(host, frontend_port)
+                self.__backend = Backend(self.__username, self.__ctx, output = self.__output)
+                self.__backend.connect(host, backend_port)
+                self.__backend.start()
+                self.__connected = True
+                return True
+            else:
+                return False
         except Exception as e:
             if DEBUG:
                 print e

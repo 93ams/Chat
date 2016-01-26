@@ -16,7 +16,7 @@ def print_rooms(rooms):
     print "#rooms"
     if len(rooms) != 0:
         for room in rooms:
-            print "-" + room
+            print "-" + str(room)
     else:
         print "empty list"
 

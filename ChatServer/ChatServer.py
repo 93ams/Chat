@@ -58,17 +58,18 @@ class Worker(threading.Thread):
             msg["from"] = data["from"]
             msg["message"] = data["message"]
             msg = data["RoomID"] + ' ' + json.dumps(msg)
+            self.__pub.send_string(msg)
             if self.__db_url:
-                RoomID = data["RoomID"]
-                try:
-                    send_to_database(self.__db_url + "/" + RoomID +  "/messages", data)
-                except Exception as e:
-                    if DEBUG:
-                        print e
-            self.__pub.send_string(msg)
-        except:
-            self.__pub.send_string(msg)
-
+                if send_to_database(self.__db_url + "/messages", data):
+                    return True
+                else:
+                    return False
+            return True
+        except Exception as e:
+            if DEBUG:
+                print e
+            return False
+            
     def recv_message(self):
         msg = self.__pull.recv()
         try:

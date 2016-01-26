@@ -55,7 +55,7 @@ def add_server(host, pull_port, pub_port):
 
 def remove_server(url, serverID):
     try:
-        r = requests.delete(url + "/serverID")
+        r = requests.delete(url + "/servers/" + serverID)
         return True
     except:
         if DEBUG:
@@ -63,7 +63,6 @@ def remove_server(url, serverID):
         return False
 
 def best_server(server_list):
-    #mudar
     best = -1
     try:
         for server in server_list:
@@ -93,9 +92,6 @@ class NameServerForClients(object):
                         print e
             else:
                 new_user = {}
-                new_user["current_server"] = None
-                new_user["current_room"] = None
-                new_user["status"] = "ON"
                 new_user["username"] = username
                 try:
                     if send_to_database("POST", self.__db_url + "/users/", new_user):
@@ -107,15 +103,16 @@ class NameServerForClients(object):
 
     def unregister(self, username):
         if username:
-            if get_from_database(self.__db_url + "/users/" + str(username)):
-                data = {}
-                data["command"] = "logout"
-                try:
-                    send_to_database("PUT", self.__db_url + "/users/" + username, data)
-                    return True
-                except Exception as e:
-                    if DEBUG:
-                        print e
+            try:
+                user = get_from_database(self.__db_url + "/users/" + str(username))
+                if user:
+                    data = {}
+                    data["command"] = "logout"
+                    if send_to_database("PUT", self.__db_url + "/users/" + username, data):
+                        return True
+            except Exception as e:
+                if DEBUG:
+                    print e
         return False
 
     def report_crash(self, serverID, roomID):
@@ -124,11 +121,14 @@ class NameServerForClients(object):
     def list_rooms(self):
         try:
       	     rooms = get_from_database(self.__db_url + "/rooms/")
-             return rooms
+             room_list = []
+             for room in rooms:
+                 room_list.append(str(room["RoomID"]))
+             return room_list
         except Exception as e:
             if DEBUG:
                 print e
-            return {}
+            return []
 
     def enter_room(self, RoomID, username):
         if RoomID:
@@ -139,21 +139,21 @@ class NameServerForClients(object):
                 server = get_from_database(self.__db_url + "/servers/" + ServerID)
                 if not server:
                     return None
-                data["Username"] = username
                 data["command"] = "enter"
-                if send_to_database("PUT", self.__db_url + "/rooms/" + str(RoomID), data):
+                data["RoomID"] = RoomID
+                if send_to_database("PUT", self.__db_url + "/users/" + str(username), data):
                     return server
-            except:
+            except Exception as e:
+                if DEBUG:
+                    print e
                 try:
-                    servers = get_from_database(self.__db_url + "/servers/")
-                    if servers:
-                        server = best_server(servers)
-                        new_room = {}
-                        new_room["users"] = [username]
-                        new_room["server"] = server["ServerID"]
-                        new_room["RoomID"] = str(RoomID)
-                        if send_to_database("POST", self.__db_url + "/rooms/", new_room):
-                            return server
+                    server = get_from_database(self.__db_url + "/bestserver")
+                    new_room = {}
+                    new_room["first_user"] = username
+                    new_room["server"] = server["ServerID"]
+                    new_room["RoomID"] = str(RoomID)
+                    if send_to_database("POST", self.__db_url + "/rooms/", new_room):
+                        return server
                 except Exception as e:
                     if DEBUG:
                         print e
@@ -164,6 +164,8 @@ class NameServerForClients(object):
             try:
                 data = {}
                 user = get_from_database(self.__db_url + "/users/" + str(username))
+                print "User: "
+                print user
                 RoomID = user["current_room"]
                 if RoomID:
                     data["Username"] = username

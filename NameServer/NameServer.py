@@ -7,6 +7,8 @@ import requests, json, time
 
 DEBUG = False
 
+server_list = {}
+
 def send_to_database(method, url, data = None):
     try:
         if data and url and (method == "POST" or method == "PUT"):
@@ -25,6 +27,14 @@ def send_to_database(method, url, data = None):
             print e
     return False
 
+def add_beat(list, beat):
+    if len(list) < 10:
+        list.append(beat)
+    else:
+        list.rotate(-1)
+        list[9] = beat
+    print list
+    
 def get_from_database(url):
     try:
         r = requests.get(url)
@@ -187,15 +197,23 @@ class NameServerForServers(object):
         return self.__heartbeat_rate
 
     def heartbeat(self, data):
-        print data
+        try:
+            server = server_list[data["id"]]
+            add_beat(server["last_beats"], data["timedate"])
+        except Exception as e:
+            print e
 
     def register(self, host, pull_port, pub_port):
         #rebalancear as salas
         try:
             server = add_server(host, pull_port, pub_port)
             send_to_database("POST", self.__db_url + "/servers/", server)
+            server_list[server["ServerID"]] = {}
+            s = server_list[server["ServerID"]]
+            s["last_beats"] = []
             return server["ServerID"]
         except Exception as e:
+            print "SHIT"
             if DEBUG:
                 print e
             return None
@@ -206,7 +224,7 @@ class NameServerForServers(object):
             return True
         else:
             if DEBUG:
-                print "failed to add server to the database"
+                print "failed to remove server from the database"
             return False
 
 def main():

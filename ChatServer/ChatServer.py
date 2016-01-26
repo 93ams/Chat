@@ -1,4 +1,5 @@
  #!/usr/bin/env python
+import datetime
 import json
 import os
 import Pyro4
@@ -55,7 +56,7 @@ class Heart(threading.Thread):
     def run(self):
         data = {"id": self.__id}
         while True:
-            data["timedate"] = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+            data["timedate"] = datetime.datetime.now()
             try:
                 self.__heartbeat_handler(data)
             except Exception as e:
@@ -63,7 +64,7 @@ class Heart(threading.Thread):
                     print e
                 self.stop()
             time.sleep(1/float(self.__heartbeat_rate))
-            
+
 class Worker(threading.Thread):
     def __init__(self, pull_socket, push_socket, publish_socket):
         super(Worker, self).__init__ ()
@@ -131,15 +132,6 @@ class ChatServer():
         self.__pub_port  = find_a_port(self.__publish_socket,  9000)
         self.__setup_worker()
 
-    def unregister(self):
-        try:
-            self.__heart.stop()
-            self.__ns.unregister(self.__id)
-            self.__registered = False
-            return True
-        except:
-            return False
-
     def register(self, ns_host, ns_port):
         try:
             self.__ns = Pyro4.Proxy("PYRONAME:nameserver.servers")
@@ -150,10 +142,20 @@ class ChatServer():
                 self.__heart.start()
                 self.__registered = True
                 return True
+
         except Exception as e:
             if DEBUG:
                 print e
         return False
+
+    def unregister(self):
+        try:
+            self.__heart.stop()
+            self.__ns.unregister(self.__id)
+            self.__registered = False
+            return True
+        except:
+            return False
 
     def start(self):
         self.__worker.start()

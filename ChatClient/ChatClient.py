@@ -121,14 +121,18 @@ class Frontend(threading.Thread):
             if self.__failure_handler:
                 if self.__failure_handler(self.__serverID):
                     self.__socket.send(message)
+                    return True
                 else:
                     if DEBUG:
                         print "fail"
+                    return False
             else:
                 self.__socket.send(message)
+                return True
         except Exception as e:
             if DEBUG:
                 print e
+            return False
 
     def stop(self):
         self.__socket.close()
@@ -178,13 +182,13 @@ class ChatClient():
     def is_registered(self):
         return self.__registered
 
-    def connect(self, host, frontend_port, backend_port):
+    def connect(self):
         try:
             if self.__ns.check_server(self.__server["ServerID"]):
                 self.__frontend = Frontend(self.__ctx, serverID = self.__server["ServerID"], failure_handler = self.__ns.check_server)
-                self.__frontend.connect(host, frontend_port)
+                self.__frontend.connect(self.__server["host"], self.__server["pull_port"])
                 self.__backend = Backend(self.__username, self.__ctx, output = self.__output)
-                self.__backend.connect(host, backend_port)
+                self.__backend.connect(self.__server["host"], self.__server["pub_port"])
                 self.__backend.start()
                 self.__connected = True
                 return True
@@ -215,11 +219,11 @@ class ChatClient():
 
     def enter_room(self, RoomID):
         if RoomID:
-            server = self.__ns.get_room_server(RoomID, self.__username)
+            server = self.__ns.get_room_server(RoomID)
             if server:
                 try:
                     self.__server = server
-                    if self.connect(server["host"], server["pull_port"], server["pub_port"]):
+                    if self.connect():
                         self.__ns.enter_room(RoomID, self.__username)
                         self.__current_room = RoomID
                         self.__backend.subscribe(RoomID)
@@ -227,11 +231,12 @@ class ChatClient():
                     else:
                         if DEBUG:
                             print "Failed to enter room: " + RoomID
-
                 except Exception as e:
                     if DEBUG:
                         print e
                         print "failed to connect to server"
+            else:
+                print "failed to connect to server"
         return False
 
     def leave_room(self):
@@ -240,7 +245,7 @@ class ChatClient():
             self.__server = None
             self.__ns.leave_room(self.__username)
             self.__current_room = None
-            self.__backend.unsubscribe(RoomID)
+            self.__backend.unsubscribe(self.__current_room)
             return True
         except:
             return False
@@ -254,12 +259,26 @@ class ChatClient():
                 "from": self.__username,
                 "RoomID": to
             }
-            self.__frontend.send(json.dumps(message))
-            return True
+            if self.__frontend.send(json.dumps(message)):
+                return True
+            else:
+                return False
         except Exception as e:
             if DEBUG:
                 print e
             return False
+
+    def reconnect(self):
+        try:
+            server = self.__ns.get_room_server(self.__current_room)
+            if server:
+                if server["ServerID"] != self.__server["ServerID"]:
+                    print "check"
+            if DEBUG:
+                tprint("Unable to send message!")
+        except Exception as e:
+            if DEBUG:
+                print e
 
     def room(self):
         End = False
@@ -271,7 +290,7 @@ class ChatClient():
                 os.system('clear')
             elif cmd != "":
                 if not self.send_message(cmd):
-                    tprint("Unable to send message!")
+                    self.reconnect()
 
     def stop(self):
         if self.__registered:

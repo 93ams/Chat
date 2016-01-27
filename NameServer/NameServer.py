@@ -5,7 +5,7 @@ import Pyro4
 from uuid import uuid4
 import requests, json, time, datetime
 
-DEBUG = False
+DEBUG = True
 
 server_list = {}
 
@@ -149,22 +149,24 @@ class NameServerForClients(object):
                 print e
             return []
 
-    def get_room_server(self, RoomID, username):
+    def get_room_server(self, RoomID):
         try:
             room = get_from_database(self.__db_url + "/rooms/" + str(RoomID))
+            print room
             if room:
                 ServerID = room["server"]
-                server = get_from_database(self.__db_url + "/servers/" + ServerID)
+                server = get_from_database(self.__db_url + "/servers/" + str(ServerID))
                 if server:
                     return server
             else:
                 server = get_from_database(self.__db_url + "/bestserver")
+                print server
                 if server:
                     new_room = {}
-                    new_room["first_user"] = username
                     new_room["server"] = server["ServerID"]
                     new_room["RoomID"] = str(RoomID)
                     if send_to_database("POST", self.__db_url + "/rooms/", new_room):
+                        print "yaayyeee"
                         return server
         except Exception as e:
             if DEBUG:

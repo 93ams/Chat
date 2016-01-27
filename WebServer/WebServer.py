@@ -261,18 +261,11 @@ class Rooms(webapp2.RequestHandler):
             RoomID = str(data["RoomID"])
             new_room = {}
             new_room["RoomID"] = RoomID
-            new_room["messages"] = []
             new_room["server"] = data["server"]
-            first_user_name = data["first_user"]
             database.rooms.insert(new_room)
-            data = {"current_room": RoomID}
-            if database.users.update(first_user_name, data):
-                self.response.write('OK')
-            else:
-                self.response.write('FAIL')
+            self.response.write('OK')
         except Exception as e:
             if DEBUG:
-                print "POST Rooms"
                 print e
             self.response.write('FAIL')
 
@@ -287,7 +280,6 @@ class Rooms(webapp2.RequestHandler):
                 self.response.write('FAIL')
         except Exception as e:
             if DEBUG:
-                print "PUT Rooms"
                 print e
             self.response.write('FAIL')
 

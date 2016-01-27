@@ -5,7 +5,7 @@ import Pyro4
 from uuid import uuid4
 import requests, json, time, datetime
 
-DEBUG = True
+DEBUG = False
 
 server_list = {}
 
@@ -131,7 +131,6 @@ class NameServerForClients(object):
         if now - last_beat < datetime.timedelta(seconds = 5 * self.__heartbeat_rate):
             return True
         else:
-            #resolver
             return False
 
     def report_crash(self, serverID):
@@ -152,7 +151,6 @@ class NameServerForClients(object):
     def get_room_server(self, RoomID):
         try:
             room = get_from_database(self.__db_url + "/rooms/" + str(RoomID))
-            print room
             if room:
                 ServerID = room["server"]
                 server = get_from_database(self.__db_url + "/servers/" + str(ServerID))
@@ -160,13 +158,11 @@ class NameServerForClients(object):
                     return server
             else:
                 server = get_from_database(self.__db_url + "/bestserver")
-                print server
                 if server:
                     new_room = {}
                     new_room["server"] = server["ServerID"]
                     new_room["RoomID"] = str(RoomID)
                     if send_to_database("POST", self.__db_url + "/rooms/", new_room):
-                        print "yaayyeee"
                         return server
         except Exception as e:
             if DEBUG:
@@ -216,6 +212,7 @@ class NameServerForServers(object):
 
     def register(self, host, pull_port, pub_port):
         #rebalancear as salas
+
         try:
             server = add_server(host, pull_port, pub_port)
             send_to_database("POST", self.__db_url + "/servers/", server)
@@ -230,7 +227,7 @@ class NameServerForServers(object):
             return None
 
     def unregister(self, server_id):
-        #rebalancear as salas
+
         if remove_server(self.__db_url, server_id):
             return True
         else:
@@ -239,7 +236,7 @@ class NameServerForServers(object):
             return False
 
 def main():
-    db_url = "http://localhost:7000/nameserver"
+    db_url = "http://localhost:7000/nameserver" #"http://powerful-link-120314.appspot.com/nameserver"
     heartbeat_rate = 1
 
     Server_NS = NameServerForServers(db_url, heartbeat_rate)

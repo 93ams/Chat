@@ -6,7 +6,7 @@ import sys
 import threading
 import zmq
 
-DEBUG = True
+DEBUG = False
 
 def tprint(msg):
     sys.stdout.write(msg + '\n> ')
@@ -142,6 +142,7 @@ class ChatClient():
         self.__registered = False
         self.__connected = False
         self.__server = None
+        self.__pending_messages = []
         self.__output = output
         self.__username = ""
         self.__current_room = None
@@ -190,6 +191,9 @@ class ChatClient():
                 self.__backend = Backend(self.__username, self.__ctx, output = self.__output)
                 self.__backend.connect(self.__server["host"], self.__server["pub_port"])
                 self.__backend.start()
+                while self.__pending_messages:
+                    msg = self.__pending_messages.pop()
+                    self.__frontend.send(msg)
                 self.__connected = True
                 return True
             else:
@@ -262,6 +266,7 @@ class ChatClient():
             if self.__frontend.send(json.dumps(message)):
                 return True
             else:
+                self.__pending_messages.append(message)
                 return False
         except Exception as e:
             if DEBUG:
@@ -316,7 +321,7 @@ class ChatClient():
                 if self.__registered:
                     if roomID != "":
                         if self.enter_room(roomID):
-                            #os.system('clear')
+                            os.system('clear')
                             print "Room " + roomID
                             self.room()
                     else:
@@ -336,7 +341,7 @@ def main():
         server.run()
 
     server.stop()
-    #os.system('reset')
+    os.system('reset')
 
 if __name__ == '__main__':
     main()

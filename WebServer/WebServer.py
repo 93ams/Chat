@@ -5,14 +5,13 @@ import webapp2
 from webapp2_extras import routes
 from DataBase import DataBase
 
-DEBUG = True
+DEBUG = False
 
 #################### WebAppServer ####################
 
 database = DataBase()
 
-if DEBUG:
-    database.reset()
+database.reset()
 
 class MainPage(webapp2.RequestHandler):
     def get(self):
@@ -83,7 +82,6 @@ class UsersList(webapp2.RequestHandler):
     def get(self, RoomID = None):
         if RoomID:
             users = database.users.get(RoomID = RoomID)
-            print users
             if users:
                 self.response.write('Users in room ' + str(RoomID) + ': ')
                 self.response.write(users)
@@ -91,7 +89,6 @@ class UsersList(webapp2.RequestHandler):
                 self.response.write('There is no user in this room, yet')
         else:
             users = database.users.get()
-            print users
             if users:
                 self.response.write('Active Users: ')
                 self.response.write(users)
@@ -103,7 +100,6 @@ class MessagesCount(webapp2.RequestHandler):
         if RoomID:
             try:
                 number_of_messages = database.messages.count(RoomID = RoomID)
-                print "#" + str(number_of_messages)
                 if number_of_messages:
                     self.response.write('Number of messages sent: ' + str(number_of_messages))
                 else:
@@ -115,7 +111,6 @@ class MessagesCount(webapp2.RequestHandler):
         elif Username:
             try:
                 number_of_messages = database.messages.count(Username = Username)
-                print "#" + str(number_of_messages)
                 if number_of_messages:
                     self.response.write('Number of messages sent: ' + str(number_of_messages))
                 else:
@@ -125,7 +120,6 @@ class MessagesCount(webapp2.RequestHandler):
                 self.response.write("User doesn't exist, yet")
         else:
             number_of_messages = database.messages.count()
-            print "#" + str(number_of_messages)
             if number_of_messages:
                 self.response.write('Number of messages sent: ' + str(number_of_messages))
             else:
@@ -136,7 +130,6 @@ class MessagesList(webapp2.RequestHandler):
         if RoomID:
             try:
                 message_list = database.messages.get(RoomID = RoomID)
-                print message_list
                 if message_list:
                     self.response.write('List of messages of room: ' + str(RoomID))
                     self.response.write(message_list)
@@ -149,7 +142,6 @@ class MessagesList(webapp2.RequestHandler):
         elif Username:
             try:
                 message_list = database.messages.get(Username = Username)
-                print message_list
                 if message_list:
                     self.response.write('List of messages of user: ' + str(Username))
                     self.response.write(message_list)
@@ -221,7 +213,6 @@ class BestServer(webapp2.RequestHandler):
                     if rooms:
                         for room in rooms:
                             n_users += database.users.count(RoomID = room["RoomID"])
-                        print n_users
                         if best == -1 or best > n_users:
                             best = n_users
                             best_server = server
@@ -240,11 +231,13 @@ class BestServer(webapp2.RequestHandler):
 ####################### Rooms ##########################
 
 class Rooms(webapp2.RequestHandler):
-    def get(self, RoomID = None):
+    def get(self, RoomID = None, ServerID = None):
         try:
             if RoomID:
                 room = database.rooms.get(RoomID = RoomID)
-                print room
+                self.response.write(json.dumps(room))
+            elif ServerID:
+                room = database.rooms.get(ServerID = ServerID)
                 self.response.write(json.dumps(room))
             else:
                 rooms = database.rooms.get()
@@ -320,10 +313,8 @@ class Users(webapp2.RequestHandler):
 
     def put(self, UserName):
         try:
-            print "PASCOA"
             data = json.loads(self.request.body)
             command = data["command"]
-            print command
             if command == "login":
                 data = {"status": "ON"}
                 if database.users.update(UserName, data):
@@ -406,6 +397,7 @@ app = webapp2.WSGIApplication([
     webapp2.Route(r'/html/<RoomID:\w+>/messages', MessagesList),
 
     webapp2.Route(r'/nameserver/servers/<ServerID:[\w-]*>', Servers),
+    webapp2.Route(r'/nameserver/servers/<ServerID:[\w-]+>/rooms', Rooms),
     webapp2.Route(r'/nameserver/bestserver', BestServer),
     webapp2.Route(r'/nameserver/rooms/<RoomID:\w*>', Rooms),
     webapp2.Route(r'/nameserver/users/<UserName:\w*>', Users),

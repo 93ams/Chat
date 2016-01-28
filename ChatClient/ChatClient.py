@@ -6,7 +6,7 @@ import sys
 import threading
 import zmq
 
-DEBUG = False
+DEBUG = True
 
 def tprint(msg):
     sys.stdout.write(msg + '\n> ')
@@ -227,7 +227,6 @@ class ChatClient():
             if server:
                 try:
                     self.__server = server
-                    print server
                     if self.connect():
                         self.__ns.enter_room(RoomID, self.__username)
                         self.__current_room = RoomID

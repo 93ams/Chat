@@ -51,8 +51,6 @@ def parser(type, item = None):
 				parsed_item["Message"] = item.text
 				parsed_item["RoomID"] =	item.room
 				parsed_item["From"] = item.from_user
-			else:
-				return {}
 			return parsed_item
 		except Exception as e:
 			if DEBUG:
@@ -89,14 +87,18 @@ class Servers():
 				ServerID = server.serverID
 				rooms = Room.query(Room.server == ServerID).fetch()
 				n_users = 0
-				for room in rooms:
-					RoomID = room.roomID
-					print RoomID
-					n_users += Users.query(User.room == RoomID).count()
-				if best == -1 or best > n_users:
-					best = n_users
+				if rooms:
+					for room in rooms:
+						RoomID = room.roomID
+						n_users += User.query(User.current_room == RoomID).count()
+					if best == -1 or best > n_users:
+						best = n_users
+						best_server = server
+				else:
 					best_server = server
-		except Excepion as e:
+					break
+
+		except Exception as e:
 			if DEBUG:
 				print e
 

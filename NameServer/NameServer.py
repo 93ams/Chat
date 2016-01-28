@@ -5,7 +5,7 @@ import Pyro4
 from uuid import uuid4
 import requests, json, time, datetime
 
-DEBUG = False
+DEBUG = True
 
 server_list = {}
 
@@ -27,23 +27,25 @@ def send_to_database(method, url, data = None):
             print e
     return False
 
-def add_beat(list, beat):
-    if len(list) == 5:
-        list.pop(0)
-    list.append(beat)
-
 def get_from_database(url):
     try:
         r = requests.get(url)
-        if DEBUG:
-            print r.text
-        data = json.loads(r.text)
+        try:
+            data = json.loads(r.text)
+        except:
+            if DEBUG:
+                print r.text
         return data
     except Exception as e:
         if DEBUG:
             print e
             print url
         return None
+
+def add_beat(list, beat):
+    if len(list) == 5:
+        list.pop(0)
+    list.append(beat)
 
 def add_server(host, pull_port, pub_port):
     new_server = {}
@@ -132,7 +134,7 @@ class NameServerForClients(object):
         beat_list = server["last_beats"]
         last_beat = beat_list[len(beat_list) - 1]
         now = datetime.datetime.now()
-        if now - last_beat < datetime.timedelta(seconds = 5 * self.__heartbeat_rate):
+        if now - last_beat < datetime.timedelta(seconds = 5 / float(self.__heartbeat_rate)):
             return True
         else:
             return False
@@ -242,7 +244,7 @@ class NameServerForServers(object):
 def main():
     db_url = "http://localhost:7000"
     #db_url = "http://powerful-link-120314.appspot.com"
-    heartbeat_rate = 1
+    heartbeat_rate = 5.0
 
     Server_NS = NameServerForServers(db_url, heartbeat_rate)
     Client_NS = NameServerForClients(db_url, heartbeat_rate)

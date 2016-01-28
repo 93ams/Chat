@@ -11,7 +11,7 @@ DEBUG = True
 
 database = DataBase()
 
-database.reset()
+#database.reset()
 
 class MainPage(webapp2.RequestHandler):
     def get(self):
@@ -80,7 +80,7 @@ class UsersCount(webapp2.RequestHandler):
 
 class UsersList(webapp2.RequestHandler):
     def get(self, RoomID = None):
-        s=''
+        s = ''
         if RoomID:
             users = database.users.get(RoomID = RoomID)
             if users:
@@ -141,14 +141,14 @@ class MessagesList(webapp2.RequestHandler):
                     s += '<h4>List of Messages between given indexes</h4>'
                     s += '<p>Start Index '
                     s += '<select name = "begin_index">'
-                    for begin in range(1, message_list):
+                    for begin in range(1, message_list+1):
                         s +='<option value="%s">%s</option>' %( begin, begin)
 
                     s +='</select></p>'
                     s += '<p>End Index '
                     s += '<select name="end_index">'
 
-                    for end in range(1, message_list):
+                    for end in range(1, message_list+1):
                         s +='<option value="%s">%s</option>' %(end, end)
 
                     s += '</select></p>'
@@ -159,7 +159,7 @@ class MessagesList(webapp2.RequestHandler):
             except Exception as e:
                 if DEBUG:
                     print e
-                s += "<p>Room doesn't exists, yet</p>"
+                s += "<p>Room doesn't exist, yet</p>"
         elif Username:
             try:
                 message_list = database.messages.count(Username = Username)
@@ -169,14 +169,14 @@ class MessagesList(webapp2.RequestHandler):
                     s += '<h4>List of Messages between given indexes</h4>'
                     s += '<p>Start Index '
                     s += '<select name="begin_index">'
-                    for begin in range(1, message_list):
+                    for begin in range(1, message_list+1):
                         s +='<option value="%s">%s</option>' %( begin, begin)
 
                     s +='</select></p>'
                     s += '<p>End Index '
                     s += '<select name="end_index">'
 
-                    for end in range(1, message_list):
+                    for end in range(1, message_list+1):
                         s +='<option value="%s">%s</option>' %(end, end)
 
                     s += '</select></p>'
@@ -187,7 +187,7 @@ class MessagesList(webapp2.RequestHandler):
             except Exception as e:
                 if DEBUG:
                     print e
-                s += "<p>User doesn't exists, yet</p>"
+                s += "<p>User doesn't exist, yet</p>"
         else:
             message_list = database.messages.count()
             if message_list:
@@ -195,14 +195,14 @@ class MessagesList(webapp2.RequestHandler):
                 s += '<h4>List of Messages between given indexes</h4>'
                 s += '<p>Start Index '
                 s += '<select name="begin_index">'
-                for begin in range(1, message_list):
+                for begin in range(1, message_list+1):
                     s +='<option value="%s">%s</option>' %( begin, begin)
 
                 s += '</select></p>'
                 s += '<p>End Index '
                 s += '<select name="end_index">'
 
-                for end in range(1, message_list):
+                for end in range(1, message_list+1):
                     s += '<option value="%s">%s</option>' %(end, end)
 
                 s += '</select></p>'
@@ -486,8 +486,6 @@ app = webapp2.WSGIApplication([
     webapp2.Route(r'/html/users/<Username:\w+>/messages', MessagesList),
     webapp2.Route(r'/html/users/<Username:\w+>/listmessages',MessageListHandler),
     webapp2.Route(r'/html/users/<Username:\w+>/messages/count', MessagesCount),
-
-
 
     webapp2.Route(r'/nameserver/servers/<ServerID:[\w-]*>', Servers),
     webapp2.Route(r'/nameserver/servers/<ServerID:[\w-]+>/rooms', Rooms),

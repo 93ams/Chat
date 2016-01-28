@@ -5,7 +5,7 @@ import webapp2
 from webapp2_extras import routes
 from DataBase import DataBase
 
-DEBUG = False
+DEBUG = True
 
 #################### WebAppServer ####################
 
@@ -31,11 +31,11 @@ class MainPage(webapp2.RequestHandler):
                 for user in users:
                     s += '<p>'
                     s += '<h4>User: ' + user["Username"] + ' </h4>'
-                    s += '<a href="html/users/' + user["Username"] + '/messages/count">Number of messages of user: ' + user["Username"] + ' </a> &nbsp '
-                    s += '<a href="html/users/' + user["Username"] +'/messages">List of messages of user: ' + user["Username"] + ' </a> &nbsp '
+                    s += '<a href="html/users/' + user["Username"] + '/messages/count">Number of messages </a> &nbsp '
+                    s += '<a href="html/users/' + user["Username"] +'/messages">List of messages </a> &nbsp '
                     s += '</p>'
             else:
-                s += '<h3>No User Exist, Yet</h3>'
+                s += '<h3>No User exists, Yet</h3>'
         except Exception as e:
             if DEBUG:
                 print e
@@ -48,13 +48,13 @@ class MainPage(webapp2.RequestHandler):
                 for room in rooms:
                     s += '<p>'
                     s += '<h4>Room: ' + room["RoomID"] + ' </h4>'
-                    s += '<a href="html/' + room["RoomID"] + '/users/count">Number of users in room: ' + room["RoomID"] + ' </a> &nbsp '
-                    s += '<a href="html/' + room["RoomID"] + '/users">List of users in room: ' + room["RoomID"] + ' </a> &nbsp '
-                    s += '<a href="html/' + room["RoomID"] + '/messages/count">Number of messages in room: ' + room["RoomID"] + ' </a> &nbsp '
-                    s += '<a href="html/' + room["RoomID"] + '/messages">List of messages in room: ' + room["RoomID"] + ' </a> &nbsp '
+                    s += '<a href="html/rooms/' + room["RoomID"] + '/users/count">Number of users </a> &nbsp '
+                    s += '<a href="html/rooms/' + room["RoomID"] + '/users">List of users </a> &nbsp '
+                    s += '<a href="html/rooms/' + room["RoomID"] + '/messages/count">Number of messages </a> &nbsp '
+                    s += '<a href="html/rooms/' + room["RoomID"] + '/messages">List of messages </a> &nbsp '
                     s += '</p>'
             else:
-                s += '<h3>No Room Exist, Yet</h3>'
+                s += '<h3>No Room exists, Yet</h3>'
         except Exception as e:
             if DEBUG:
                 print e
@@ -68,32 +68,36 @@ class UsersCount(webapp2.RequestHandler):
         if RoomID:
             users_in_room = database.users.count(RoomID = RoomID)
             if users_in_room:
-                self.response.write('There are ' + str(users_in_room) + ' users in room: ' + str(RoomID))
+                self.response.write('<p>There are ' + str(users_in_room) + ' users in room: ' + str(RoomID) + '</p>')
             else:
-                self.response.write('There is no user in this room, yet')
+                self.response.write('<p>There is no user in this room, yet</p>')
         else:
             number_of_users = database.users.count()
             if number_of_users:
-                self.response.write('There are ' + str(number_of_users) + ' connected')
+                self.response.write('<p>There are ' + str(number_of_users) + ' connected</p>')
             else:
-                self.response.write('There are no users, yet')
+                self.response.write('<p>There are no users, yet</p>')
 
 class UsersList(webapp2.RequestHandler):
     def get(self, RoomID = None):
+        s=''
         if RoomID:
             users = database.users.get(RoomID = RoomID)
             if users:
-                self.response.write('Users in room ' + str(RoomID) + ': ')
-                self.response.write(users)
+                s += '<h3>Users in room ' + str(RoomID) + '</h3>'
+                for user in users:
+                    s += '<h4>' + str(user["Username"])+'</h4>'
             else:
-                self.response.write('There is no user in this room, yet')
+                s += '<p>There is no user in this room, yet</p>'
         else:
             users = database.users.get()
             if users:
-                self.response.write('Active Users: ')
-                self.response.write(users)
+                s += '<h3>Active Users</h3>'
+                for user in users:
+        			s += '<h4>' + str(user["Username"]) + '</h4>'
             else:
-                self.response.write('There is no user connected, yet')
+                s += '<p>There is no user connected, yet</p>'
+        self.response.write(s)
 
 class MessagesCount(webapp2.RequestHandler):
     def get(self, RoomID = None, Username = None):
@@ -101,63 +105,149 @@ class MessagesCount(webapp2.RequestHandler):
             try:
                 number_of_messages = database.messages.count(RoomID = RoomID)
                 if number_of_messages:
-                    self.response.write('Number of messages sent: ' + str(number_of_messages))
+                    self.response.write('<p>Number of messages sent: ' + str(number_of_messages) + '</p>')
                 else:
-                    self.response.write('No message has been sent in this room, yet')
+                    self.response.write('<p>No message has been sent in this room, yet</p>')
             except Exception as e:
                 if DEBUG:
                     print e
-                self.response.write("This group doesn't exist, yet")
+                self.response.write("<p>This group doesn't exists, yet</p>")
         elif Username:
             try:
                 number_of_messages = database.messages.count(Username = Username)
                 if number_of_messages:
-                    self.response.write('Number of messages sent: ' + str(number_of_messages))
+                    self.response.write('<p>Number of messages sent: ' + str(number_of_messages)+'</p>')
                 else:
-                    self.response.write('No message has been sent by this user, yet')
+                    self.response.write('<p>No message has been sent by this user, yet</p>')
             except Exception as e:
                 print e
-                self.response.write("User doesn't exist, yet")
+                self.response.write("</p>User doesn't exists, yet</p>")
         else:
             number_of_messages = database.messages.count()
             if number_of_messages:
-                self.response.write('Number of messages sent: ' + str(number_of_messages))
+                self.response.write('<p>Number of messages sent: ' + str(number_of_messages) + '</p>')
             else:
-                self.response.write('No message has been sent, yet')
+                self.response.write('<p>No message has been sent, yet</p>')
 
 class MessagesList(webapp2.RequestHandler):
     def get(self, RoomID = None, Username = None):
+        s = ''
         if RoomID:
             try:
-                message_list = database.messages.get(RoomID = RoomID)
+                message_list = database.messages.count(RoomID = RoomID)
                 if message_list:
-                    self.response.write('List of messages of room: ' + str(RoomID))
-                    self.response.write(message_list)
+                    s += '<h3>List of messages of room: ' + str(RoomID) + '</h3>'
+                    s += '<form action=/html/rooms/' + RoomID + '/listmessages method="get">'
+                    s += '<h4>List of Messages between given indexes</h4>'
+                    s += '<p>Start Index '
+                    s += '<select name = "begin_index">'
+                    for begin in range(1, message_list):
+                        s +='<option value="%s">%s</option>' %( begin, begin)
+
+                    s +='</select></p>'
+                    s += '<p>End Index '
+                    s += '<select name="end_index">'
+
+                    for end in range(1, message_list):
+                        s +='<option value="%s">%s</option>' %(end, end)
+
+                    s += '</select></p>'
+                    s += '<p><input type= "submit" name="Submit" value="submit"/></p>'
+                    s += '<hr/>'
                 else:
-                    self.response.write('No message has been sent in this room, yet')
+                    s += '<p>No message has been sent in this room, yet</p>'
             except Exception as e:
                 if DEBUG:
                     print e
-                self.response.write("Room doesn't exist, yet")
+                s += "<p>Room doesn't exists, yet</p>"
         elif Username:
             try:
-                message_list = database.messages.get(Username = Username)
-                if message_list:
-                    self.response.write('List of messages of user: ' + str(Username))
-                    self.response.write(message_list)
+                message_list = database.messages.count(Username = Username)
+                if message_list != 0:
+                    s += '<h3>List of messages of user: ' + str(Username) + '</h3>'
+                    s += '<form action=/html/users/' + Username + '/listmessages method="get">'
+                    s += '<h4>List of Messages between given indexes</h4>'
+                    s += '<p>Start Index '
+                    s += '<select name="begin_index">'
+                    for begin in range(1, message_list):
+                        s +='<option value="%s">%s</option>' %( begin, begin)
+
+                    s +='</select></p>'
+                    s += '<p>End Index '
+                    s += '<select name="end_index">'
+
+                    for end in range(1, message_list):
+                        s +='<option value="%s">%s</option>' %(end, end)
+
+                    s += '</select></p>'
+                    s += '<p><input type= "submit" name="Submit" value="submit"/></p>'
+                    s += '<hr/>'
                 else:
-                    self.response.write('No message has been sent by this user, yet')
+                    s += '<p>No message has been sent by this user, yet</p>'
             except Exception as e:
-                print e
-                self.response.write("User doesn't exist, yet")
+                if DEBUG:
+                    print e
+                s += "<p>User doesn't exists, yet</p>"
+        else:
+            message_list = database.messages.count()
+            if message_list:
+                s += '<form action=/html/listmessages method="get">'
+                s += '<h4>List of Messages between given indexes</h4>'
+                s += '<p>Start Index '
+                s += '<select name="begin_index">'
+                for begin in range(1, message_list):
+                    s +='<option value="%s">%s</option>' %( begin, begin)
+
+                s += '</select></p>'
+                s += '<p>End Index '
+                s += '<select name="end_index">'
+
+                for end in range(1, message_list):
+                    s += '<option value="%s">%s</option>' %(end, end)
+
+                s += '</select></p>'
+                s += '<p><input type= "submit" name="Submit" value="submit"/></p>'
+                s += '<hr/>'
+            else:
+                s += '<p>No message has been sent, yet</p>'
+        self.response.write(s)
+
+class MessageListHandler(webapp2.RequestHandler):
+    def get(self, RoomID = None, Username = None):
+        s = ''
+        if RoomID:
+            message_list = database.messages.get(RoomID = RoomID)
+            if message_list:
+                s += '<h4> Room %s </h4>' %(RoomID)
+            else:
+                s += '<p>No message was sent in this room, yet</p>'
+        elif Username:
+            message_list = database.messages.get(Username = Username)
+            if message_list:
+                s += '<h4> User %s </h4>' %(Username)
+            else:
+                s += '<p>No message was sent by this user, yet</p>'
         else:
             message_list = database.messages.get()
-            print message_list
             if message_list:
-                self.response.write('List of messages: ')
-                self.response.write(message_list)
+                s += '<h4> Messages </h4>'
             else:
-                self.response.write('No message has been sent, yet')
+                s += '<p>No message was sent, yet</p>'
+
+        if message_list:
+    		begin_index = self.request.GET["begin_index"]
+    		end_index = self.request.GET["end_index"]
+    		begin = int(begin_index)
+    		end = int(end_index)
+    		messages = message_list[(begin-1):end]
+
+    		s += '<h5>List of messages between indexes %s and %s</h5>' %(begin_index, end_index)
+    		for message in messages:
+    			s+='<p>' + message["Message"] + ' by:' + message["From"] + '</p>'
+
+		self.response.write(s)
+
+
 
 ####################### Servers ########################
 
@@ -192,7 +282,17 @@ class Servers(webapp2.RequestHandler):
 
     def delete(self, ServerID):
         try:
+            rooms = database.rooms.get(ServerID = str(ServerID))
             database.servers.remove(str(ServerID))
+            for room in rooms:
+                new_server = database.servers.get_best()
+                if new_server:
+                    data = {"server": new_server["ServerID"]}
+                else:
+                    data = {"server": None}
+                if not database.rooms.update(room["RoomID"], data):
+                    raise
+
             self.response.write('OK')
         except Exception as e:
             if DEBUG:
@@ -202,23 +302,9 @@ class Servers(webapp2.RequestHandler):
 
 class BestServer(webapp2.RequestHandler):
     def get(self):
-        best_server = {}
-        best = -1
-        servers = database.servers.get()
         try:
-            if servers:
-                for server in servers:
-                    rooms = database.rooms.get(ServerID = server["ServerID"])
-                    n_users = 0
-                    if rooms:
-                        for room in rooms:
-                            n_users += database.users.count(RoomID = room["RoomID"])
-                        if best == -1 or best > n_users:
-                            best = n_users
-                            best_server = server
-                    else:
-                        best = 0
-                        best_server = server
+            best_server = database.servers.get_best()
+            if best_server:
                 self.response.write(json.dumps(best_server))
             else:
                 self.response.write(json.dumps({}))
@@ -273,6 +359,7 @@ class Rooms(webapp2.RequestHandler):
                 self.response.write('FAIL')
         except Exception as e:
             if DEBUG:
+                print "PUT Rooms"
                 print e
             self.response.write('FAIL')
 
@@ -386,15 +473,21 @@ app = webapp2.WSGIApplication([
 
     webapp2.Route(r'/html/users/', UsersList),
     webapp2.Route(r'/html/users/count', UsersCount),
-    webapp2.Route(r'/html/<RoomID:\w+>/users/count', UsersCount),
-    webapp2.Route(r'/html/<RoomID:\w+>/users', UsersList),
-
     webapp2.Route(r'/html/messages', MessagesList),
+    webapp2.Route(r'/html/listmessages', MessageListHandler),
     webapp2.Route(r'/html/messages/count', MessagesCount),
+
+    webapp2.Route(r'/html/rooms/<RoomID:\w+>/users', UsersList),
+    webapp2.Route(r'/html/rooms/<RoomID:\w+>/users/count', UsersCount),
+    webapp2.Route(r'/html/rooms/<RoomID:\w+>/messages', MessagesList),
+    webapp2.Route(r'/html/rooms/<RoomID:\w+>/listmessages',MessageListHandler),
+    webapp2.Route(r'/html/rooms/<RoomID:\w+>/messages/count', MessagesCount),
+
     webapp2.Route(r'/html/users/<Username:\w+>/messages', MessagesList),
+    webapp2.Route(r'/html/users/<Username:\w+>/listmessages',MessageListHandler),
     webapp2.Route(r'/html/users/<Username:\w+>/messages/count', MessagesCount),
-    webapp2.Route(r'/html/<RoomID:\w+>/messages/count', MessagesCount),
-    webapp2.Route(r'/html/<RoomID:\w+>/messages', MessagesList),
+
+
 
     webapp2.Route(r'/nameserver/servers/<ServerID:[\w-]*>', Servers),
     webapp2.Route(r'/nameserver/servers/<ServerID:[\w-]+>/rooms', Rooms),

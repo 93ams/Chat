@@ -227,6 +227,7 @@ class ChatClient():
             if server:
                 try:
                     self.__server = server
+                    print server
                     if self.connect():
                         self.__ns.enter_room(RoomID, self.__username)
                         self.__current_room = RoomID
@@ -273,20 +274,9 @@ class ChatClient():
                 print e
             return False
 
-    def reconnect(self):
-        try:
-            server = self.__ns.get_room_server(self.__current_room)
-            if server:
-                if server["ServerID"] != self.__server["ServerID"]:
-                    print "check"
-            if DEBUG:
-                tprint("Unable to send message!")
-        except Exception as e:
-            if DEBUG:
-                print e
-
     def room(self):
         End = False
+        RoomID = self.__current_room
         while not End:
             cmd = raw_input("> ")
             if cmd == "/exit":
@@ -295,7 +285,8 @@ class ChatClient():
                 os.system('clear')
             elif cmd != "":
                 if not self.send_message(cmd):
-                    self.reconnect()
+                    self.leave_room()
+                    self.enter_room(RoomID)
 
     def stop(self):
         if self.__registered:

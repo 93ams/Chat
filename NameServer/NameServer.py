@@ -63,11 +63,15 @@ def add_server(host, pull_port, pub_port):
 def remove_server(url, serverID):
     try:
         r = requests.delete(url + "/servers/" + serverID)
-        return True
+        if r.text == "OK":
+            return True
+        else:
+            if DEBUG:
+                print r.text
     except:
         if DEBUG:
             print "failed to remove server: " + server_id
-        return False
+    return False
 
 def best_server(server_list):
     best = -1
@@ -83,7 +87,7 @@ def best_server(server_list):
 
 class NameServerForClients(object):
     def __init__(self, db_url, heartbeat_rate):
-        self.__db_url = db_url
+        self.__db_url = db_url + "/nameserver"
         self.__heartbeat_rate = heartbeat_rate
 
     def register(self, username):
@@ -208,27 +212,27 @@ class NameServerForServers(object):
             server = server_list[data["id"]]
             add_beat(server["last_beats"],  datetime.datetime.now())
         except Exception as e:
-            print e
+            if DEBUG:
+                print e
+
+    def get_db_url(self):
+        return self.__db_url
 
     def register(self, host, pull_port, pub_port):
-        #rebalancear as salas
-
         try:
             server = add_server(host, pull_port, pub_port)
-            send_to_database("POST", self.__db_url + "/servers/", server)
+            send_to_database("POST", self.__db_url + "/nameserver/servers/", server)
             server_list[server["ServerID"]] = {}
             s = server_list[server["ServerID"]]
             s["last_beats"] = []
             return server["ServerID"]
         except Exception as e:
-            print "SHIT"
             if DEBUG:
                 print e
             return None
 
     def unregister(self, server_id):
-
-        if remove_server(self.__db_url, server_id):
+        if remove_server(self.__db_url + "/nameserver", server_id):
             return True
         else:
             if DEBUG:
@@ -236,7 +240,8 @@ class NameServerForServers(object):
             return False
 
 def main():
-    db_url = "http://localhost:7000/nameserver" #"http://powerful-link-120314.appspot.com/nameserver"
+    db_url = "http://localhost:7000"
+    #db_url = "http://powerful-link-120314.appspot.com"
     heartbeat_rate = 1
 
     Server_NS = NameServerForServers(db_url, heartbeat_rate)

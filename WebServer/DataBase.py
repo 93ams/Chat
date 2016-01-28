@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from google.appengine.ext import ndb
 
-DEBUG = False
+DEBUG = True
 REMOTE = False
 
 if REMOTE:
@@ -80,6 +80,29 @@ class Servers():
 				print e
 			return {}
 
+	def get_best(self):
+		servers = Server.query().fetch()
+		best = -1
+		best_server = None
+		try:
+			for server in servers:
+				ServerID = server.serverID
+				rooms = Room.query(Room.server == ServerID).fetch()
+				n_users = 0
+				for room in rooms:
+					RoomID = room.roomID
+					print RoomID
+					n_users += Users.query(User.room == RoomID).count()
+				if best == -1 or best > n_users:
+					best = n_users
+					best_server = server
+		except Excepion as e:
+			if DEBUG:
+				print e
+
+		return parser("server", best_server)
+
+
 	def count(self):
 		try:
 			count = Server.query().count()
@@ -123,7 +146,7 @@ class Servers():
 			else:
 				servers = Server.query().fetch()
 				for server in servers:
-					print server.key.delete()
+					server.key.delete()
 			return True
 		except Exception as e:
 			if DEBUG:
@@ -185,13 +208,14 @@ class Rooms():
 	def update(self, RoomID, data):
 		if RoomID:
 			try:
-				room = Room(Room.roomID == RoomID).get()
+				room = Room.query(Room.roomID == RoomID).get()
 				if "server" in data:
-				    room.server = data.get("server")
+					room.server = data.get("server")
+				room.put()
+				return True
 			except Exception as e:
 				if DEBUG:
 					print e
-				pass
 		return False
 
 	def remove(self, RoomID = None):
@@ -242,7 +266,6 @@ class Users():
 		try:
 			if RoomID:
 				count = User.query(User.current_room == RoomID).count()
-				print "User count: " + str(count)
 			else:
 				count = User.query().count()
 		except Exception as e:
@@ -264,8 +287,6 @@ class Users():
 		if Username:
 			try:
 				user = User.query(User.username == Username).get()
-				print "User: "
-				print user
 				if "current_room" in data:
 				    user.current_room = data.get("current_room")
 				if "status" in data:
@@ -382,8 +403,7 @@ class Messages():
 				if "message" in data:
 					message.from_user = data.get("message")
 				return True
-			else:
-				pass
+
 		except Exception as e:
 			if DEBUG:
 				print e
@@ -421,10 +441,15 @@ class DataBase(object):
 
 	def reset(self):
 		try:
-			self.messages.remove()
-			self.users.remove()
-			self.rooms.remove()
-			self.servers.remove()
+			print "Reset"
+			print "messages"
+			print self.messages.remove()
+			print "users"
+			print self.users.remove()
+			print "rooms"
+			print self.rooms.remove()
+			print "servers"
+			print self.servers.remove()
 		except Exception as e:
 			if DEBUG:
 				print e

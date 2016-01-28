@@ -118,7 +118,6 @@ class ChatServer():
 
     def __setup_worker(self):
         self.__worker = Worker(self.__pull_socket, self.__push_socket, self.__publish_socket)
-        self.__worker.set_database_url("http://localhost:7000/server")
 
     def __boot(self):
         self.__ctx = zmq.Context()
@@ -135,6 +134,9 @@ class ChatServer():
         try:
             self.__ns = Pyro4.Proxy("PYRONAME:nameserver.servers")
             hb_rate = self.__ns.get_heartbeat_rate()
+            self.__db_url = self.__ns.get_db_url() + "/server"
+
+            self.__worker.set_database_url(self.__db_url)
             self.__id = self.__ns.register(self.__host, self.__pull_port, self.__pub_port)
             if self.__id:
                 self.__heart = Heart(self.__ns.heartbeat, hb_rate, self.__id)
@@ -153,7 +155,9 @@ class ChatServer():
             self.__ns.unregister(self.__id)
             self.__registered = False
             return True
-        except:
+        except Excepion as e:
+            if DEBUG:
+                print e
             return False
 
     def start(self):
@@ -200,7 +204,7 @@ def main():
     else:
         print "Unable to register server"
     server.stop()
-    #os.system('reset')
+    os.system('reset')
 
 if __name__ == '__main__':
     main()

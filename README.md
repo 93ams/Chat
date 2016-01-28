@@ -2,4 +2,6 @@
 
 +Servidor de nomes
 +Servidor de chat
-+GUI de cliente chat
++Servidor Web
++Base de Dados
++Interface Cliente (terminal)
